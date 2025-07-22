@@ -1,6 +1,9 @@
 """..."""
 
 from typing import Optional
+
+from pydantic import EmailStr
+
 from app.schemas.base import BaseSchema
 
 
@@ -14,4 +17,4 @@ class Token(BaseSchema):
 class TokenData(BaseSchema):
     """..."""
 
-    id: Optional[str] = None
+    email: Optional[EmailStr] = None

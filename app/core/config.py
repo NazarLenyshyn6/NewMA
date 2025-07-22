@@ -24,7 +24,7 @@ class PostgresConfig(BaseConfig):
     DB_NAME: str
 
     @property
-    def url(self) -> str:
+    def DATABASE_URL(self) -> str:
         """..."""
         return f"postgresql://{self.DB_USER}:{self.DB_PASS}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
@@ -32,12 +32,12 @@ class PostgresConfig(BaseConfig):
 class SQLiteConfig(BaseConfig):
     """..."""
 
-    SQLITE_DB_PATH: str
+    sqlite_db_path: str
 
     @property
-    def url(self) -> str:
+    def DATABASE_URL(self) -> str:
         """..."""
-        return f"sqlite:///{self.SQLITE_DB_PATH}"
+        return f"sqlite:///{self.sqlite_db_path}"
 
 
 class JWTConfig(BaseConfig):
@@ -48,7 +48,7 @@ class JWTConfig(BaseConfig):
     ACCESS_TOKEN_EXPIRE_MINUTES: int
 
     @property
-    def access_token_expires(self) -> timedelta:
+    def ACCESS_TOKEN_EXPIRE_MINUTES_TIMEDELTA(self) -> timedelta:
         return timedelta(minutes=self.ACCESS_TOKEN_EXPIRE_MINUTES)
 
 

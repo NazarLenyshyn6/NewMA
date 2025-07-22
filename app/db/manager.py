@@ -26,4 +26,4 @@ class DBManager:
             db.close()
 
 
-db_manager = DBManager(url=settings.postgres.url)
+db_manager = DBManager(url=settings.postgres.DATABASE_URL)

@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 
 
-class IPasswordHaher(ABC):
+class IHasher(ABC):
     """..."""
 
     @abstractmethod

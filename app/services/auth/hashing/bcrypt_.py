@@ -7,7 +7,7 @@ from passlib.context import CryptContext
 from app.services.auth.hashing import base as hashing_base
 
 
-class BcryptHasher(hashing_base.IPasswordHaher):
+class BcryptHasher(hashing_base.IHasher):
     """..."""
 
     def __init__(self):

@@ -25,4 +25,5 @@ class UserRead(BaseSchema):
 class UserInDB(BaseSchema):
     """..."""
 
-    hashed_password: str
+    email: EmailStr
+    password: str
