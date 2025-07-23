@@ -3,12 +3,12 @@
 import uvicorn
 from fastapi import FastAPI
 
-from app.models import base as models_base
-from app.db.manager import db_manager
 from app.api.v1.router import api_router
+from app.db.manager import db_manager
+from app.models.base import Base
 
-models_base.Base.metadata.create_all(bind=db_manager.engine)
 
+Base.metadata.create_all(bind=db_manager.engine)
 
 app = FastAPI()
 

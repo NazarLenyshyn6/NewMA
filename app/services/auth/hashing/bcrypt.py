@@ -4,10 +4,10 @@ from typing_extensions import override
 
 from passlib.context import CryptContext
 
-from app.services.auth.hashing import base as hashing_base
+from app.services.auth.hashing.base import IHasher
 
 
-class BcryptHasher(hashing_base.IHasher):
+class BcryptHasher(IHasher):
     """..."""
 
     def __init__(self):

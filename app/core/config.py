@@ -1,7 +1,7 @@
 """..."""
 
-from datetime import timedelta
 from pathlib import Path
+from datetime import timedelta
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -32,12 +32,12 @@ class PostgresConfig(BaseConfig):
 class SQLiteConfig(BaseConfig):
     """..."""
 
-    sqlite_db_path: str
+    SQLITE_DB_PATH: str
 
     @property
     def DATABASE_URL(self) -> str:
         """..."""
-        return f"sqlite:///{self.sqlite_db_path}"
+        return f"sqlite:///{self.SQLITE_DB_PATH}"
 
 
 class JWTConfig(BaseConfig):
@@ -68,5 +68,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-print(settings.local_storage.LOCAL_STORAGE_PATH)

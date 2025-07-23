@@ -1,30 +1,61 @@
 """..."""
 
+from dataclasses import dataclass
 from typing import Optional
 
-from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
 from pydantic import EmailStr
+from sqlalchemy.orm import Session
+from fastapi.security import OAuth2PasswordBearer
 
-from app.services.user.service import UserService
-from app.services.auth.jwt_ import JWTHandler, jwt_handler
+from app.schemas.auth import token as token_schemas
+from app.schemas.auth import user as user_schemas
+from app.repositories.auth.repository import AuthRepository
+from app.services.auth.jwt_handler import JWTHandler, jwt_handler
 from app.services.auth.hashing.base import IHasher
-from app.services.auth.hashing.bcrypt_ import bcrypt_hasher
-from app.schemas import user as user_schemas
-from app.schemas import token as token_schemas
+from app.services.auth.hashing.bcrypt import bcrypt_hasher
 
 
+@dataclass
 class AuthService:
-    jwt_handler: JWTHandler = jwt_handler
-    hasher: IHasher = bcrypt_hasher
-    oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
+    jwt_handler: JWTHandler
+    hasher: IHasher
+    oauth2_scheme: OAuth2PasswordBearer
+
+    @staticmethod
+    def _get_user_by_id(db: Session, id: str) -> Optional[user_schemas.UserInDB]:
+        """..."""
+        db_user = AuthRepository.get_user_by_id(db=db, id=id)
+        if not db_user:
+            return None
+        return user_schemas.UserInDB.model_validate(db_user)
+
+    @staticmethod
+    def _get_user_by_email(
+        db: Session, email: EmailStr
+    ) -> Optional[user_schemas.UserInDB]:
+        """..."""
+        db_user = AuthRepository.get_user_by_email(db=db, email=email)
+        if not db_user:
+            return None
+        return user_schemas.UserInDB.model_validate(db_user)
+
+    @staticmethod
+    def _create_user(
+        db: Session, user: user_schemas.UserCreate
+    ) -> user_schemas.UserRead:
+        """..."""
+        hashed_password = bcrypt_hasher.hash(user.password)
+        user_data = user.model_dump()
+        user_data["password"] = hashed_password
+        db_user = AuthRepository.create_user(db=db, user_data=user_data)
+        return user_schemas.UserRead.model_validate(db_user)
 
     @classmethod
     def authenticate(
         cls, db: Session, email: EmailStr, password: str
     ) -> Optional[user_schemas.UserInDB]:
         """..."""
-        user = UserService.get_user_by_email(db=db, email=email)
+        user = cls._get_user_by_email(db=db, email=email)
         if not user or not cls.hasher.verify(password, user.password):
             return None
         return user
@@ -42,7 +73,14 @@ class AuthService:
     def get_current_user(cls, db: Session, token: str) -> user_schemas.UserInDB:
         """..."""
         token_data = cls.jwt_handler.decode_access_token(token=token)
-        user = UserService.get_user_by_id(db=db, id=token_data.id)
+        user = cls._get_user_by_id(db=db, id=token_data.id)
         if not user:
             raise cls.jwt_handler.credential_exception
         return user
+
+
+auth_service = AuthService(
+    jwt_handler=jwt_handler,
+    hasher=bcrypt_hasher,
+    oauth2_scheme=OAuth2PasswordBearer(tokenUrl="api/v1/auth/login"),
+)

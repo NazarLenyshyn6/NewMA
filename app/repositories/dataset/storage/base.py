@@ -1,11 +1,10 @@
 """..."""
 
-from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import Dict, Callable
+from pathlib import Path
 
 import pandas as pd
-
 from fastapi import UploadFile, HTTPException, status
 
 
@@ -21,6 +20,7 @@ class IStorage(ABC):
 
     @property
     def valid_extensions(self) -> str:
+        """..."""
         return ", ".join(f".{ext}" for ext in self._loaders.keys())
 
     @staticmethod

@@ -1,14 +1,15 @@
 """..."""
 
 from dataclasses import dataclass
-from datetime import timedelta, datetime
 from typing import Optional
+from datetime import timedelta, datetime
+
 
 from jose import JWTError, jwt
 from fastapi import HTTPException, status
 
 from app.core.config import settings
-from app.schemas.token import TokenData
+from app.schemas.auth.token import TokenData
 
 
 @dataclass
