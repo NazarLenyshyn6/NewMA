@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from pydantic import EmailStr
 
 from app.schemas import user as user_schemas
-from app.repositories import user as user_repository
+from app.repositories.user import repository as user_repository
 from app.services.auth.hashing import bcrypt_
 
 
@@ -14,9 +14,19 @@ class UserService:
     """..."""
 
     @staticmethod
-    def get_user(db: Session, email: EmailStr) -> Optional[user_schemas.UserInDB]:
+    def get_user_by_id(db: Session, id: str) -> Optional[user_schemas.UserInDB]:
         """..."""
-        db_user = user_repository.UserRepository.get_user(db=db, email=email)
+        db_user = user_repository.UserRepository.get_user_by_id(db=db, id=id)
+        if not db_user:
+            return None
+        return user_schemas.UserInDB.model_validate(db_user)
+
+    @staticmethod
+    def get_user_by_email(
+        db: Session, email: EmailStr
+    ) -> Optional[user_schemas.UserInDB]:
+        """..."""
+        db_user = user_repository.UserRepository.get_user_by_email(db=db, email=email)
         if not db_user:
             return None
         return user_schemas.UserInDB.model_validate(db_user)

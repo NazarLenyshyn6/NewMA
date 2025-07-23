@@ -15,12 +15,10 @@ class BcryptHasher(hashing_base.IHasher):
 
     @override
     def hash(self, password: str) -> str:
-        """..."""
         return self._context.hash(password)
 
     @override
     def verify(self, plain_password: str, hashed_password: str) -> bool:
-        """..."""
         return self._context.verify(plain_password, hashed_password)
 
 

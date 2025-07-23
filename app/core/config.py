@@ -52,12 +52,21 @@ class JWTConfig(BaseConfig):
         return timedelta(minutes=self.ACCESS_TOKEN_EXPIRE_MINUTES)
 
 
+class LocalStorageConfig(BaseConfig):
+    """..."""
+
+    LOCAL_STORAGE_PATH: str
+
+
 class Settings(BaseSettings):
     """..."""
 
     postgres: PostgresConfig = PostgresConfig()
     sqlite: SQLiteConfig = SQLiteConfig()
     jwt: JWTConfig = JWTConfig()
+    local_storage: LocalStorageConfig = LocalStorageConfig()
 
 
 settings = Settings()
+
+print(settings.local_storage.LOCAL_STORAGE_PATH)

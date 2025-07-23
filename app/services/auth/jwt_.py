@@ -41,11 +41,12 @@ class JWTHandler:
         """..."""
         try:
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
-            email = payload.get(key)
-            if email is None:
+            id = payload.get(key)
+            if id is None:
                 raise self.credential_exception
-            return TokenData(email=email)
-        except JWTError:
+            return TokenData(id=id)
+        except JWTError as e:
+            print(e)
             raise self.credential_exception
 
 

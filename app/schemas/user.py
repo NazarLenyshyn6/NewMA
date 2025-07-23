@@ -1,6 +1,7 @@
 """..."""
 
 from datetime import datetime
+from typing import Optional
 
 from pydantic import EmailStr, Field
 
@@ -25,5 +26,5 @@ class UserRead(BaseSchema):
 class UserInDB(BaseSchema):
     """..."""
 
-    email: EmailStr
+    id: Optional[int] = None
     password: str
