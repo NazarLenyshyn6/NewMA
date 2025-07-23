@@ -58,8 +58,11 @@ class DatasetService:
     def delete_dataset(self, db: Session, user_id: int, name: str) -> None:
         """..."""
         db_dataset = self.repository.get_dataset(db=db, user_id=user_id, name=name)
-        if not db_dataset:
-            return
+        if db_dataset is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Dataset {name} not found.",
+            )
         self.repository.delete_dataset(db=db, user_id=user_id, name=name)
         self.repository.delete_from_storage(uri=db_dataset.uri)
 

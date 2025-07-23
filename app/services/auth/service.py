@@ -50,32 +50,29 @@ class AuthService:
         db_user = AuthRepository.create_user(db=db, user_data=user_data)
         return user_schemas.UserRead.model_validate(db_user)
 
-    @classmethod
     def authenticate(
-        cls, db: Session, email: EmailStr, password: str
+        self, db: Session, email: EmailStr, password: str
     ) -> Optional[user_schemas.UserInDB]:
         """..."""
-        user = cls._get_user_by_email(db=db, email=email)
-        if not user or not cls.hasher.verify(password, user.password):
+        user = self._get_user_by_email(db=db, email=email)
+        if not user or not self.hasher.verify(password, user.password):
             return None
         return user
 
-    @classmethod
-    def login(cls, db: Session, email: str, password: str) -> token_schemas.Token:
+    def login(self, db: Session, email: str, password: str) -> token_schemas.Token:
         """..."""
-        user = cls.authenticate(db=db, email=email, password=password)
+        user = self.authenticate(db=db, email=email, password=password)
         if not user:
-            raise cls.jwt_handler.credential_exception
-        access_token = cls.jwt_handler.create_access_token(data={"sub": str(user.id)})
+            raise self.jwt_handler.credential_exception
+        access_token = self.jwt_handler.create_access_token(data={"sub": str(user.id)})
         return token_schemas.Token(access_token=access_token, token_type="bearer")
 
-    @classmethod
-    def get_current_user(cls, db: Session, token: str) -> user_schemas.UserInDB:
+    def get_current_user(self, db: Session, token: str) -> user_schemas.UserInDB:
         """..."""
-        token_data = cls.jwt_handler.decode_access_token(token=token)
-        user = cls._get_user_by_id(db=db, id=token_data.id)
+        token_data = self.jwt_handler.decode_access_token(token=token)
+        user = self._get_user_by_id(db=db, id=token_data.id)
         if not user:
-            raise cls.jwt_handler.credential_exception
+            raise self.jwt_handler.credential_exception
         return user
 
 
