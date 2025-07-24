@@ -46,8 +46,7 @@ class JWTHandler:
             if id is None:
                 raise self.credential_exception
             return TokenData(id=id)
-        except JWTError as e:
-            print(e)
+        except JWTError:
             raise self.credential_exception
 
 

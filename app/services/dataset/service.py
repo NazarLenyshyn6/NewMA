@@ -7,9 +7,15 @@ import pandas as pd
 from sqlalchemy.orm import Session
 from fastapi import UploadFile, HTTPException, status
 
+from app.core.logger_setup import configure_logger
 from app.schemas.dataset import DatasetRead
 from app.repositories.dataset.repository import dataset_repository, DatasetRepository
 from app.services.dataset.summarizer import DatasetSummarizer
+
+
+logger = configure_logger(
+    name="service_dataset", subfolder="services", filename="dataset.log"
+)
 
 
 @dataclass
@@ -21,8 +27,10 @@ class DatasetService:
     ) -> DatasetRead:
         """..."""
         # Upload file to storate
+        logger.info("Saving dataset '%s' for user_id=%s", name, user_id)
         db_dataset = self.repository.get_dataset(db=db, name=name, user_id=user_id)
         if db_dataset is not None:
+            logger.warning("Dataset '%s' already exists for user_id=%s", name, user_id)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Dataset with name '{name}' already exists.",
@@ -31,8 +39,13 @@ class DatasetService:
             user_id=user_id, dataset_name=name, file=file
         )
 
+        logger.info(
+            "Uploaded dataset '%s' for user_id=%s to storage at %s", name, user_id, uri
+        )
+
         # Merge all metadata
         df = self.repository.download_from_storage(uri=uri)
+        logger.debug("Downloaded dataset '%s' for summarization", name)
         summary = DatasetSummarizer.summarize(df=df, name=name)
         dataset = {
             "name": name,
@@ -43,38 +56,50 @@ class DatasetService:
 
         # Save to DB
         db_dataset = self.repository.create_dataset(db=db, dataset=dataset)
+        logger.info("Dataset '%s' saved in DB with ID %s", name, db_dataset.id)
         return DatasetRead.model_validate(db_dataset)
 
     def download_dataset(self, db: Session, name: str, user_id: int) -> pd.DataFrame:
         """..."""
+        logger.info("Downloading dataset '%s' for user_id=%s", name, user_id)
         db_dataset = self.repository.get_dataset(db=db, name=name, user_id=user_id)
         if db_dataset is None:
+            logger.warning("Dataset '%s' not found for user_id=%s", name, user_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Dataset {name} not found.",
             )
         return self.repository.download_from_storage(uri=db_dataset.uri)
 
-    def delete_dataset(self, db: Session, user_id: int, name: str) -> None:
+    def delete_dataset(self, db: Session, user_id: int, name: str) -> str:
         """..."""
+        logger.info("Deleting dataset '%s' for user_id=%s", name, user_id)
         db_dataset = self.repository.get_dataset(db=db, user_id=user_id, name=name)
         if db_dataset is None:
+            logger.warning(
+                "Dataset '%s' not found for deletion for user_id=%s", name, user_id
+            )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Dataset {name} not found.",
             )
         self.repository.delete_dataset(db=db, user_id=user_id, name=name)
         self.repository.delete_from_storage(uri=db_dataset.uri)
+        logger.info("Dataset '%s' deleted successfully for user_id=%s", name, user_id)
+        return f"Dataset '{name}' deleted successfully"
 
     def get_datasets(self, db: Session, user_id: int) -> List[DatasetRead]:
         """..."""
+        logger.debug("Fetching all datasets for user_id=%s", user_id)
         db_datasets = self.repository.get_datasets(db=db, user_id=user_id)
         return [DatasetRead.model_validate(dataset) for dataset in db_datasets]
 
     def get_dataset(self, db: Session, name: str, user_id: int) -> DatasetRead:
         """..."""
+        logger.debug("Fetching dataset '%s' for user_id=%s", name, user_id)
         db_dataset = self.repository.get_dataset(db=db, name=name, user_id=user_id)
         if db_dataset is None:
+            logger.warning("Dataset '%s' not found for user_id=%s", name, user_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Dataset {name} not found.",

@@ -178,5 +178,7 @@ checkpoints/
 .env.development
 secrets/
 keys/
+storage/
+logs/
 *.key
 *.pem

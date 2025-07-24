@@ -58,6 +58,14 @@ class LocalStorageConfig(BaseConfig):
     LOCAL_STORAGE_PATH: str
 
 
+class LoggingConfig(BaseConfig):
+    """..."""
+
+    LOG_DIR_PATH: Path
+    JSON_FORMAT: bool
+    CONSOLE_LOG: bool
+
+
 class Settings(BaseSettings):
     """..."""
 
@@ -65,6 +73,7 @@ class Settings(BaseSettings):
     sqlite: SQLiteConfig = SQLiteConfig()
     jwt: JWTConfig = JWTConfig()
     local_storage: LocalStorageConfig = LocalStorageConfig()
+    logging: LoggingConfig = LoggingConfig()
 
 
 settings = Settings()

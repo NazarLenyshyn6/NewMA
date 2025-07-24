@@ -36,6 +36,12 @@ class IStorage(ABC):
                 detail=f"Invalid file extention: .{extention}. Allowed: {self.valid_extensions}",
             )
 
+    @property
+    @abstractmethod
+    def storage_type(self) -> str:
+        """..."""
+        ...
+
     @abstractmethod
     def __init__(self, uri_scheme: str, *args, **kwargs):
         """..."""
