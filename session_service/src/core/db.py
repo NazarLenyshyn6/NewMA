@@ -27,7 +27,3 @@ class DBManager:
 
 
 db_manager = DBManager(url=settings.postgres.URL)
-
-from models.base import Base
-
-Base.metadata.create_all(db_manager.engine)
