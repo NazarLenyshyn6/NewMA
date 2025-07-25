@@ -168,8 +168,6 @@ logs/
 *.ckpt
 *.pt
 *.pth
-data/
-models/
 checkpoints/
 
 # API keys and secrets
@@ -178,7 +176,5 @@ checkpoints/
 .env.development
 secrets/
 keys/
-storage/
-logs/
 *.key
 *.pem
