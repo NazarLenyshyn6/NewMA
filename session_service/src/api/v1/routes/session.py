@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Form
 
 from core.db import db_manager
 from core.security import get_current_user_id
-from schemas.session import SessionCreate, SessionActivate
+from schemas.session import SessionCreate
 from services.session import session_service
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])

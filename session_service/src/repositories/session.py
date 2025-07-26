@@ -90,7 +90,6 @@ class SessionRepository:
     @classmethod
     def set_active_session(cls, db: Session, user_id: int, title: str) -> None:
         """..."""
-        cls.deactivate_active_session(db=db, user_id=user_id)
         db_session = cls.get_session_by_title(db=db, user_id=user_id, title=title)
 
         if db_session is None:
@@ -98,6 +97,7 @@ class SessionRepository:
                 f"No session found with title '{title}' for user_id={user_id}"
             )
 
+        cls.deactivate_active_session(db=db, user_id=user_id)
         db_session.active = True
         db.commit()
 

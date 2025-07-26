@@ -33,6 +33,9 @@ class SessionCacheManager:
                 port=self.port,
                 db=self.db,
                 decode_responses=True,
+                socket_keepalive=True,
+                socket_connect_timeout=5,
+                socket_timeout=5,
             )
 
     def close_client(self) -> None:

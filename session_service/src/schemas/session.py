@@ -20,9 +20,3 @@ class SessionRead(BaseSchema):
     user_id: int
     title: str
     active: bool
-
-
-class SessionActivate(BaseSchema):
-    """..."""
-
-    title: str
