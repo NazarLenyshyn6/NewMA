@@ -41,11 +41,20 @@ class SecurityConfig(BaseConfig):
         return timedelta(minutes=self.ACCESS_TOKEN_EXPIRE_MINUTES)
 
 
+class RedisConfig(BaseConfig):
+    """..."""
+
+    HOST: str
+    PORT: int
+    DB: int
+
+
 class Settings(BaseSettings):
     """..."""
 
     postgres: PostgresConfig = PostgresConfig()
     security: SecurityConfig = SecurityConfig()
+    redis: RedisConfig = RedisConfig()
 
 
 settings = Settings()

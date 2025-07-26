@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from core.security import JWTHandler, jwt_handler, Hasher, hasher
 from schemas.user import UserInDB, UserRead
-from schemas.token import Token
+from schemas.auth_token import Token
 from services.user import UserService
 
 

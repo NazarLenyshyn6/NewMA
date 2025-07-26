@@ -9,7 +9,7 @@ from jose import JWTError, jwt
 from fastapi import HTTPException, status
 
 from core.config import settings
-from schemas.token import TokenData
+from schemas.auth_token import TokenData
 
 
 class Hasher:
