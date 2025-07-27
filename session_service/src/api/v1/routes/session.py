@@ -1,11 +1,11 @@
 """..."""
 
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, Form
+from fastapi import APIRouter, Depends
 
 from core.db import db_manager
 from core.security import get_current_user_id
-from schemas.session import SessionCreate
+from schemas.session import SessionCreate, NewSession
 from services.session import session_service
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
@@ -29,21 +29,23 @@ def get_active_session_id(
 
 @router.post("/")
 def create_session(
-    title: str = Form(),
+    new_session: NewSession,
     db: Session = Depends(db_manager.get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    session_data = SessionCreate(user_id=user_id, title=title)
+    session_data = SessionCreate(user_id=user_id, title=new_session.title)
     return session_service.create_session(db=db, session_data=session_data)
 
 
 @router.post("/active/{title}")
 def set_active_session(
-    title: str,
+    new_session: NewSession,
     db: Session = Depends(db_manager.get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    return session_service.set_active_session(db=db, user_id=user_id, title=title)
+    return session_service.set_active_session(
+        db=db, user_id=user_id, title=new_session.title
+    )
 
 
 @router.delete("/{title}")

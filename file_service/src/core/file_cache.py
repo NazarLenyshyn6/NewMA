@@ -1,5 +1,6 @@
 """..."""
 
+from uuid import UUID
 from dataclasses import dataclass
 from typing import Optional
 
@@ -9,14 +10,14 @@ from core.config import settings
 
 
 @dataclass
-class SessionCacheManager:
+class FileCacheManager:
     """..."""
 
     host: str
     port: int
     db: int
-    key_prefix: str
     client: Optional[Redis] = None
+    default_ttl: int = 3600
 
     def _ensure_connected(self):
         """..."""
@@ -48,40 +49,38 @@ class SessionCacheManager:
             finally:
                 self.client = None
 
-    def cache_active_session_id(
-        self, user_id: str, session_id: str, ex: int = 1800
+    @staticmethod
+    def format_key(user_id: int, session_id: UUID) -> str:
+        """..."""
+        return f"active_file:user{user_id}:session:{session_id}"
+
+    def cache_active_file_data(
+        self, user_id: int, session_id: UUID, file_data: dict
     ) -> None:
         """..."""
         self._ensure_connected()
-        key = f"{self.key_prefix}{user_id}"
+        key = self.format_key(user_id, session_id)
         try:
-            self.client.set(name=key, value=session_id, ex=ex)
+            self.client.hset(name=key, mapping=file_data)
+            self.client.expire(key, self.default_ttl)
         except RedisError:
             ...
 
-    def get_active_session_id(self, user_id: str) -> Optional[str]:
+    def get_active_file_data(self, user_id: int, session_id: UUID) -> Optional[dict]:
         """..."""
         self._ensure_connected()
-        key = f"{self.key_prefix}{user_id}"
+        key = self.format_key(user_id, session_id)
         try:
-            value = self.client.get(key)
-            return value
-        except RedisError:
-            ...
-
-    def deactivate_active_session_id(self, user_id: str) -> None:
-        """..."""
-        self._ensure_connected()
-        key = f"{self.key_prefix}{user_id}"
-        try:
-            self.client.delete(key)
+            file_data = self.client.hgetall(key)
+            if file_data:
+                self.client.expire(key, self.default_ttl)
+            return file_data
         except RedisError:
             ...
 
 
-session_cache = SessionCacheManager(
+file_cache = FileCacheManager(
     host=settings.redis.HOST,
     port=settings.redis.PORT,
     db=settings.redis.DB,
-    key_prefix="session:active:user:",
 )
