@@ -3,7 +3,7 @@
 from pydantic import BaseModel
 
 
-class ActiveFile(BaseModel):
+class ActiveFileRequest(BaseModel):
     """..."""
 
     file_name: str

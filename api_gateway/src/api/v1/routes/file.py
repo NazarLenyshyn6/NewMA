@@ -1,11 +1,9 @@
 """..."""
 
-from uuid import UUID
-
 from fastapi import APIRouter, Depends, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordBearer
 
-from schemas.file import ActiveFile
+from schemas.file import ActiveFileRequest
 from clients.file import FileClient
 from clients.session import SessionClient
 
@@ -26,7 +24,9 @@ def get_active_file(token: str = Depends(oauth2_scheme)):
 
 
 @router.post("/active/")
-def set_active_file(active_file: ActiveFile, token: str = Depends(oauth2_scheme)):
+def set_active_file(
+    active_file: ActiveFileRequest, token: str = Depends(oauth2_scheme)
+):
     session = SessionClient.get_active_session_id(token=token)
     return FileClient.set_active_file(
         token=token, session=session, file_name=active_file.file_name

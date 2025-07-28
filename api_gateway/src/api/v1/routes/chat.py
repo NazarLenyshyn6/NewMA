@@ -16,7 +16,7 @@ def chat(question: str, token: str = Depends(oauth2_scheme)):
     actvice_session = SessionClient.get_active_session_id(token=token)
     active_file = FileClient.get_active_file(token=token, session=actvice_session)
     return {
-        "detail": "Hello :)",
+        "mocked answer": "Hello :)",
         "user_questoin": question,
         "active_session": actvice_session,
         "active_file": active_file,
