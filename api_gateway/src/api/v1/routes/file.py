@@ -36,11 +36,11 @@ def set_active_file(active_file: ActiveFile, token: str = Depends(oauth2_scheme)
 @router.post("/")
 def upload_file(
     file_name: str = Form(),
-    session_id: UUID = Form(),
     description: str = Form(),
     file: UploadFile = File(...),
     token: str = Depends(oauth2_scheme),
 ):
+    session_id = SessionClient.get_active_session_id(token=token)
     return FileClient.upload_file(
         token=token,
         file=file,
