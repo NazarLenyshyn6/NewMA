@@ -2,25 +2,17 @@
 
 import requests
 
-from core.exceptions import ClientError
-
 
 class BaseClient:
     @staticmethod
     def _handle_response(response: requests.Response):
-        try:
-            response.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            raise ClientError(
-                status_code=response.status_code,
-                message=str(e),
-                response_text=response.text,
-            )
+        """..."""
+        response.raise_for_status()
+
         try:
             return response.json()
-        except ValueError:
-            raise ClientError(
-                status_code=response.status_code,
-                message="Response content is not valid JSON.",
-                response_text=response.text,
-            )
+        except ValueError as e:
+            raise requests.HTTPError(
+                f"Failed to parse JSON response. Response text: {response.text}",
+                response=response,
+            ) from e
