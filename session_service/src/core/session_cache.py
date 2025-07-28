@@ -17,6 +17,7 @@ class SessionCacheManager:
     db: int
     key_prefix: str
     client: Optional[Redis] = None
+    default_ttl: int = 3600
 
     def _ensure_connected(self):
         """..."""
@@ -49,13 +50,15 @@ class SessionCacheManager:
                 self.client = None
 
     def cache_active_session_id(
-        self, user_id: str, session_id: str, ex: int = 1800
+        self,
+        user_id: str,
+        session_id: str,
     ) -> None:
         """..."""
         self._ensure_connected()
         key = f"{self.key_prefix}{user_id}"
         try:
-            self.client.set(name=key, value=session_id, ex=ex)
+            self.client.set(name=key, value=session_id, ex=self.default_ttl)
         except RedisError:
             ...
 
@@ -64,8 +67,10 @@ class SessionCacheManager:
         self._ensure_connected()
         key = f"{self.key_prefix}{user_id}"
         try:
-            value = self.client.get(key)
-            return value
+            session_id = self.client.get(key)
+            if session_id:
+                self.client.expire(key, self.default_ttl)
+            return session_id
         except RedisError:
             ...
 
