@@ -7,6 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from schemas.file import ActiveFile
 from clients.file import FileClient
+from clients.session import SessionClient
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/gateway/auth/login")
 
@@ -18,15 +19,15 @@ def get_files(token: str = Depends(oauth2_scheme)):
     return FileClient.get_files(token=token)
 
 
-@router.get("/{session}")
-def get_active_file(session: UUID, token: str = Depends(oauth2_scheme)):
+@router.get("/active")
+def get_active_file(token: str = Depends(oauth2_scheme)):
+    session = SessionClient.get_active_session_id(token=token)
     return FileClient.get_active_file(token=token, session=session)
 
 
-@router.post("/active/{session}")
-def set_active_file(
-    active_file: ActiveFile, session: UUID, token: str = Depends(oauth2_scheme)
-):
+@router.post("/active/")
+def set_active_file(active_file: ActiveFile, token: str = Depends(oauth2_scheme)):
+    session = SessionClient.get_active_session_id(token=token)
     return FileClient.set_active_file(
         token=token, session=session, file_name=active_file.file_name
     )
