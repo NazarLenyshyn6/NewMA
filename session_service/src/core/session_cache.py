@@ -58,7 +58,8 @@ class SessionCacheManager:
         self._ensure_connected()
         key = f"{self.key_prefix}{user_id}"
         try:
-            self.client.set(name=key, value=session_id, ex=self.default_ttl)
+            self.client.set(name=key, value=session_id)
+            self.client.expire(key, self.default_ttl)
         except RedisError:
             ...
 

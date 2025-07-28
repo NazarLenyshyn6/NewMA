@@ -1,9 +1,10 @@
 """..."""
 
 from uuid import UUID
+from typing import Optional
 
 import requests
-from fastapi import UploadFile
+from fastapi import UploadFile, HTTPException, status
 
 from clients.base import BaseClient
 
@@ -75,9 +76,17 @@ class FileClient(BaseClient):
 
     @staticmethod
     def delete_file(
-        token: str, file_name: str, base_url: str = "http://127.0.0.1:8002/api/v1/files"
+        token: str,
+        file_name: str,
+        active_file_name: Optional[str],
+        base_url: str = "http://127.0.0.1:8002/api/v1/files",
     ):
         """..."""
+        if file_name == active_file_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delite active file; please deactivate it first",
+            )
         url = base_url + f"/{file_name}"
         headers = {
             "Authorization": f"Bearer {token}",

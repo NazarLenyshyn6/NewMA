@@ -61,7 +61,8 @@ class FileCacheManager:
         self._ensure_connected()
         key = self.format_key(user_id, session_id)
         try:
-            self.client.hset(name=key, mapping=file_data, ex=self.default_ttl)
+            self.client.hset(name=key, mapping=file_data)
+            self.client.expire(key, self.default_ttl)
         except RedisError:
             ...
 

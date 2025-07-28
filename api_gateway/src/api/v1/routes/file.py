@@ -52,4 +52,9 @@ def upload_file(
 
 @router.delete("/{file_name}")
 def delete_file(file_name: str, token: str = Depends(oauth2_scheme)):
-    return FileClient.delete_file(token=token, file_name=file_name)
+    session_id = SessionClient.get_active_session_id(token=token)
+    active_file = FileClient.get_active_file(token=token, session=session_id)
+    active_file_name = active_file["file_name"]
+    return FileClient.delete_file(
+        token=token, file_name=file_name, active_file_name=active_file_name
+    )
