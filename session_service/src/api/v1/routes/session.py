@@ -39,13 +39,11 @@ def create_session(
 
 @router.post("/active/{title}")
 def set_active_session(
-    new_session: NewSession,
+    title: str,
     db: Session = Depends(db_manager.get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    return session_service.set_active_session(
-        db=db, user_id=user_id, title=new_session.title
-    )
+    return session_service.set_active_session(db=db, user_id=user_id, title=title)
 
 
 @router.delete("/{title}")

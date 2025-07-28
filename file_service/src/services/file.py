@@ -2,7 +2,7 @@
 
 from uuid import UUID
 from dataclasses import dataclass
-from typing import List
+from typing import List, Union
 
 from sqlalchemy.orm import Session
 from fastapi import UploadFile, HTTPException, status
@@ -25,12 +25,14 @@ class FileService:
         db_files = FileRepository.get_files(db=db, user_id=user_id)
         return [FileRead.model_validate(file) for file in db_files]
 
-    def get_active_file(self, db: Session, user_id: int, session_id: UUID) -> FileRead:
+    def get_active_file(
+        self, db: Session, user_id: int, session_id: UUID
+    ) -> Union[dict, FileRead]:
         """..."""
         cached_file = self.file_cache.get_active_file_data(
             user_id=user_id, session_id=session_id
         )
-        if cached_file is None:
+        if not cached_file:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No active file found for session. Set it first.",

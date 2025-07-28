@@ -46,7 +46,7 @@ def set_active_file(
 
 @router.post("/")
 def upload_file(
-    name: str = Form(),
+    file_name: str = Form(),
     session_id: UUID = Form(),
     description: str = Form(),
     file: UploadFile = File(...),
@@ -55,7 +55,7 @@ def upload_file(
 ) -> FileRead:
     return file_service.upload_file(
         db=db,
-        file_name=name,
+        file_name=file_name,
         storage_type=StorageType.LOCAL,
         user_id=user_id,
         session_id=session_id,
