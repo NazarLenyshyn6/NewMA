@@ -9,7 +9,7 @@ from langchain.prompts import (
     SystemMessagePromptTemplate,
     AIMessagePromptTemplate,
 )
-from agent_core.task_selector.enums import Task
+from agent_core.task_selectors.enums import Task
 
 
 class TaskSelectionPromptBuilder:

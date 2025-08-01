@@ -8,9 +8,9 @@ from langchain.prompts import ChatPromptTemplate
 
 
 from agent_core.models.registry import anthropic_claude_sonnet_4_20250514_model
-from agent_core.task_selector.enums import Task
-from agent_core.task_selector.prompt import TaskSelectionPromptBuilder
-from agent_core.task_selector.few_shot_examples import TASK_SELECTION_EXAMPLES
+from agent_core.task_selectors.enums import Task
+from agent_core.task_selectors.prompt import TaskSelectionPromptBuilder
+from agent_core.task_selectors.few_shot_examples import TASK_SELECTION_EXAMPLES
 
 
 class TaskSelector(BaseModel):
