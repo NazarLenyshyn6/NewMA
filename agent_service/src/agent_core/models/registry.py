@@ -1,6 +1,6 @@
 """..."""
 
-from agent_service.src.agent_core.models.anthropic import build_anthropic_model
+from agent_core.models.anthropic import build_anthropic_model
 from agent_core.core.config import settings
 
 

@@ -41,9 +41,9 @@ EDA_SUBTASK_SELECTION_EXAMPLES = [
         "question": "Give me insights before any modeling.",
         "subtask": "DATA_OVERVIEW, DISTRIBUTION_ANALYSIS, CORRELATION_ANALYSIS",
     },
-    {"question": "How can I know if I’m getting fat?", "subtasks": "OTHER"},
+    {"question": "How can I know if I’m getting fat?", "subtask": "OTHER"},
     {
         "question": "Build a dashboard for marketing team to explore website traffic",
-        "subtasks": "OTHER",
+        "subtask": "OTHER",
     },
 ]
