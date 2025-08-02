@@ -5,9 +5,22 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.116.1",
+    "imblearn>=0.0",
     "langchain>=0.3.27",
     "langchain-anthropic>=0.3.18",
+    "matplotlib>=3.10.5",
+    "numpy>=2.3.2",
+    "pandas>=2.3.1",
     "pip>=25.2",
+    "psycopg2>=2.9.10",
     "pydantic>=2.11.7",
     "pydantic-settings>=2.10.1",
+    "redis>=6.2.0",
+    "scikit-learn>=1.7.1",
+    "scipy>=1.16.1",
+    "seaborn>=0.13.2",
+    "sqlalchemy>=2.0.42",
+    "statsmodels>=0.14.5",
+    "uvicorn>=0.35.0",
 ]
