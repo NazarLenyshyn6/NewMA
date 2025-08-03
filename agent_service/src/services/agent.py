@@ -6,9 +6,9 @@ from pydantic import BaseModel, ConfigDict
 
 from sqlalchemy.orm import Session
 
-from agent_core.task_selectors.builder import TaskSelector, task_selector
-from agent_core.subtask_selectors.builder import SubTaskSelector, sub_task_selector
-from agent_core.solution_planners.builder import SolutionPlanner, solution_planner
+# from agent_core.task_selectors.builder import TaskSelector, task_selector
+# from agent_core.subtask_selectors.builder import SubTaskSelector, sub_task_selector
+# from agent_core.solution_planners.builder import SolutionPlanner, solution_planner
 from agent.registry.runners.classifiers.tasks import tasks_classification_runner
 from agent.registry.runners.classifiers.subtasks import subtasks_classification_runner
 
@@ -17,9 +17,9 @@ class AgentService(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    task_selector: TaskSelector
-    subtask_selector: SubTaskSelector
-    solution_planner: SolutionPlanner
+    # task_selector: TaskSelector
+    # subtask_selector: SubTaskSelector
+    # solution_planner: SolutionPlanner
 
     def invoke(self, question: str, db: Session, session_id: UUID) -> None:
         tasks = tasks_classification_runner.classify(question=question)
@@ -43,7 +43,7 @@ class AgentService(BaseModel):
 
 
 agent_service = AgentService(
-    task_selector=task_selector,
-    subtask_selector=sub_task_selector,
-    solution_planner=solution_planner,
+    # task_selector=tasks_classification_runner,
+    # subtask_selector=subtasks_classification_runner,
+    # solution_planner=solution_planner,
 )

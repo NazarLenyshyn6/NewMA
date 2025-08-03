@@ -51,17 +51,16 @@ class FileService:
     ) -> FileRead:
         """..."""
         # Upload the file to storage and get its URI
-        storage_uri = LocalStorage.upload_file(
+        storage_uri, file_summary = LocalStorage.upload_file(
             file_name=file_name, user_id=user_id, file=file
         )
 
         # Build metadata object
-        summary = "..."
         file_data = FileCreate(
             file_name=file_name,
             storage_uri=storage_uri,
             description=description,
-            summary=summary,
+            summary=file_summary,
             storage_type=storage_type,
             user_id=user_id,
         )

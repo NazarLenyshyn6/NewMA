@@ -2,10 +2,10 @@
 
 from uuid import UUID
 from typing import Optional
-import pickle
 
 from sqlalchemy.orm import Session
 
+from core.exceptions import ChatHistoryNotFound
 from schemas.chat_history import ChatHistory as ChatHistorySchema
 from models.chat_history import ChatHistory as ChatHistoryModel
 
@@ -14,26 +14,10 @@ class ChatHistoryRepository:
     """..."""
 
     @classmethod
-    def get_chat_history(
-        cls, db: Session, session_id: UUID
-    ) -> Optional[ChatHistoryModel]:
+    def create_chat_history(
+        cls, db: Session, chat_history: ChatHistorySchema
+    ) -> ChatHistoryModel:
         """..."""
-        chat_history = (
-            db.query(ChatHistoryModel)
-            .filter(ChatHistoryModel.session_id == session_id)
-            .first()
-        )
-        return chat_history
-
-    @classmethod
-    def create_chat_history(cls, db: Session, session_id: UUID) -> ChatHistoryModel:
-        """..."""
-        chat_history = ChatHistorySchema(
-            session_id=session_id,
-            solutions=pickle.dumps([]),
-            code=pickle.dumps(""),
-            variables=pickle.dumps({}),
-        )
         db_chat_history = ChatHistoryModel(**chat_history.model_dump())
         db.add(db_chat_history)
         db.commit()
@@ -41,30 +25,61 @@ class ChatHistoryRepository:
         return db_chat_history
 
     @classmethod
-    def update_chat_history(
-        cls, db: Session, session_id: UUID, chat_history: ChatHistorySchema
-    ) -> ChatHistoryModel:
-        """..."""
-        db_chat_history = cls.get_chat_history(db=db, session_id=session_id)
-        if db_chat_history is None:
-            raise FileNotFoundError(
-                f"No chat history found for session_id={session_id}"
+    def get_chat_history(
+        cls, db: Session, user_id: int, session_id: UUID, file_name: str
+    ) -> Optional[ChatHistoryModel]:
+        return (
+            db.query(ChatHistoryModel)
+            .filter_by(
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
             )
-        update_data = chat_history.model_dump(exclude_unset=True)
-
-        for field, value in update_data.items():
-            setattr(db_chat_history, field, value)
-        db.commit()
-        db.refresh(db_chat_history)
-        return db_chat_history
+            .first()
+        )
 
     @classmethod
-    def delete_chat_history(cls, db: Session, session_id: UUID) -> None:
-        """..."""
-        db_chat_history = cls.get_chat_history(db=db, session_id=session_id)
-        if db_chat_history is None:
-            raise FileNotFoundError(
-                f"No chat history found for session_id={session_id}"
+    def update_chat_history(
+        cls,
+        db: Session,
+        user_id: int,
+        session_id: UUID,
+        file_name: str,
+        chat_history_update: ChatHistorySchema,
+    ) -> None:
+        chat_history = cls.get_chat_history(
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+        )
+
+        if chat_history is None:
+            raise ChatHistoryNotFound(
+                f"No chat history for user_id={user_id}, session_id={session_id}, file_name={file_name}"
             )
-        db.delete(db_chat_history)
+
+        if chat_history_update.solutions is not None:
+            chat_history.solutions = chat_history_update.solutions
+
+        if chat_history_update.code is not None:
+            chat_history.code = chat_history_update.code
+
+        if chat_history_update.variables is not None:
+            chat_history.variables = chat_history_update.variables
+
+        db.commit()
+
+    @classmethod
+    def delete_chat_history(cls, db: Session, user_id: int, file_name: str) -> None:
+        """..."""
+
+        (
+            db.query(ChatHistoryModel)
+            .filter(
+                ChatHistoryModel.user_id == user_id,
+                ChatHistoryModel.file_name == file_name,
+            )
+            .delete(synchronize_session=False)
+        )
         db.commit()

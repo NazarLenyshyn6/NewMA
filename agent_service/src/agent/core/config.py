@@ -20,19 +20,10 @@ class AnthropicModelConfig(BaseConfig):
     ANTHROPIC_API_KEY: str
 
 
-class RedisConfig(BaseConfig):
-    """..."""
-
-    HOST: str
-    PORT: int
-    DB: int
-
-
 class Settings(BaseSettings):
     """..."""
 
     anthropic_model: AnthropicModelConfig = AnthropicModelConfig()
-    redis: RedisConfig = RedisConfig()
 
 
 settings = Settings()

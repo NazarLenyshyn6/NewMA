@@ -31,10 +31,19 @@ class PostgresConfig(BaseConfig):
         return f"postgresql://{self.DB_USER}:{self.DB_PASS}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
 
+class RedisConfig(BaseConfig):
+    """..."""
+
+    HOST: str
+    PORT: int
+    DB: int
+
+
 class Settings(BaseSettings):
     """..."""
 
     postgres: PostgresConfig = PostgresConfig()
+    redis: RedisConfig = RedisConfig()
 
 
 settings = Settings()

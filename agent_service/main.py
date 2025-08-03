@@ -7,7 +7,8 @@ from fastapi import FastAPI
 
 from api.v1.router import api_router
 from core.db import db_manager
-from agent_core.cache.chat_history import chat_history_cache_manager
+
+from cache.chat_history import chat_history_cache
 from models.base import Base
 
 Base.metadata.create_all(bind=db_manager.engine)
@@ -15,9 +16,9 @@ Base.metadata.create_all(bind=db_manager.engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    chat_history_cache_manager.connect_client()
+    chat_history_cache.connect_client()
     yield
-    chat_history_cache_manager.close_client()
+    chat_history_cache.close_client()
 
 
 app = FastAPI(lifespan=lifespan)

@@ -14,7 +14,10 @@ class ChatHistory(Base):
 
     __tablename__ = "chat_histories"
 
+    user_id: Mapped[int] = mapped_column(primary_key=True)
     session_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    file_name: Mapped[str] = mapped_column(primary_key=True)
+
     solutions: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     code: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     variables: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)

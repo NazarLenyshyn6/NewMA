@@ -1,9 +1,11 @@
 """..."""
 
-from typing import ClassVar, Set
+from typing import ClassVar, Set, Dict
 from abc import ABC, abstractmethod
 from pathlib import Path
+from io import BytesIO
 
+import pandas as pd
 from fastapi import UploadFile
 
 from core.exceptions import UnsupportedFileExtensionError
@@ -13,6 +15,17 @@ class BaseStorage(ABC):
     """..."""
 
     allowed_file_extensions: ClassVar[Set[str]] = {"csv"}
+    _data_loaders: ClassVar[Dict] = {"csv": pd.read_csv}
+
+    @classmethod
+    def _load_data(cls, file: UploadFile, extension: str) -> pd.DataFrame:
+        """..."""
+        file.file.seek(0)
+        contents = file.file.read()
+        file_like = BytesIO(contents)
+        data_loader = cls._data_loaders[extension]
+        df = data_loader(file_like)
+        return df
 
     @staticmethod
     def get_file_extension(path: str) -> str:
@@ -27,6 +40,20 @@ class BaseStorage(ABC):
             raise UnsupportedFileExtensionError(
                 f"Invalid file extension: .{file_extension}. Allowed: {allowed}"
             )
+
+    @classmethod
+    def summarize_file(cls, file: UploadFile, extension: str) -> str:
+        """..."""
+        df = cls._load_data(file=file, extension=extension)
+        rows, columns = df.shape
+        feature_lines = "\n".join(
+            f"- **{col}**: `{dtype}`" for col, dtype in df.dtypes.items()
+        )
+
+        return (
+            f"The dataset has **{rows} rows** and **{columns} columns**.\n\n"
+            f"It contains the following features:\n\n{feature_lines}"
+        )
 
     @classmethod
     @abstractmethod

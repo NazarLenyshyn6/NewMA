@@ -1,5 +1,6 @@
 """..."""
 
+from typing import Tuple
 from typing_extensions import override
 from pathlib import Path
 import shutil
@@ -23,14 +24,17 @@ class LocalStorage(BaseStorage):
 
     @classmethod
     @override
-    def upload_file(cls, user_id: int, file_name: str, file: UploadFile) -> str:
+    def upload_file(
+        cls, user_id: int, file_name: str, file: UploadFile
+    ) -> Tuple[str, str]:
         cls._initialize_storage()
         file_extension = cls.get_file_extension(file.filename)
         cls.validate_file_extension(file_extension)
         path = cls.base_path / f"{user_id}_{file_name}.{file_extension}"
         with open(path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        return f"local://{path}"
+        summary = cls.summarize_file(file, extension=file_extension)
+        return f"local://{path}", summary
 
     @staticmethod
     @override
