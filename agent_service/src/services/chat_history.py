@@ -79,7 +79,7 @@ class ChatHistoryService:
             session_id=session_id,
             file_name=file_name,
             solutions=pickle.dumps(""),
-            code=pickle.dumps([]),
+            code=pickle.dumps(""),
             variables=pickle.dumps({"df": df}),
         )
 

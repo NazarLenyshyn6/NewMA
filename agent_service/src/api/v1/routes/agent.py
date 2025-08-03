@@ -25,4 +25,5 @@ def chat(
         session_id=chat_request.session_id,
         file_name=chat_request.file_name,
         storage_uri=chat_request.storage_uri,
+        dataset_summary=chat_request.dataset_summary,
     )

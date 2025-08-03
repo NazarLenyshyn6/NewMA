@@ -27,5 +27,6 @@ def chat(
         session_id=session_id,
         file_name=active_file["file_name"],
         storage_uri=active_file["storage_uri"],
+        dataset_summary=active_file["summary"],
     )
     return response

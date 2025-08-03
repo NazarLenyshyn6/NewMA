@@ -1,12 +1,10 @@
 """..."""
 
 from uuid import UUID
-from typing import List
 import pickle
 
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
-from langchain_core.messages import BaseMessage
 
 from services.chat_history import ChatHistoryService
 from agent.summarizers.planners import SolutionPlansSummarizer
@@ -27,7 +25,7 @@ class SolutionPlannerMemoryManager(BaseModel):
         session_id: UUID,
         file_name: str,
         storage_uri: str,
-    ) -> List[BaseMessage]:
+    ) -> str:
         """..."""
         chat_history = self.chat_history_service.get_chat_history(
             db=db,
@@ -37,7 +35,7 @@ class SolutionPlannerMemoryManager(BaseModel):
             storage_uri=storage_uri,
         )
         solutions_history_bytes = chat_history.solutions
-        solutions_history: List[BaseMessage] = pickle.loads(solutions_history_bytes)
+        solutions_history: str = pickle.loads(solutions_history_bytes)
         return solutions_history
 
     def update_solutions_history(

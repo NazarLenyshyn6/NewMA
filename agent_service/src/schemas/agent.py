@@ -11,3 +11,4 @@ class ChatRequest(BaseModel):
     session_id: UUID
     file_name: str
     storage_uri: str
+    dataset_summary: str

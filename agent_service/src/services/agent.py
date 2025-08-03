@@ -19,6 +19,12 @@ from agent.registry.runners.planners import (
     SolutionPlanningRunner,
     solution_planning_runner,
 )
+
+from agent.registry.runners.code.generator import (
+    CodeGenerationRunner,
+    code_generation_runner,
+)
+
 from agent.registry.memory.planners import solution_planner_memory_manager
 
 
@@ -29,6 +35,7 @@ class AgentService(BaseModel):
     task_classification_runner: TasksClassificationRunner
     subtask_classification_runner: SubTasksClassificationRunner
     solution_planning_runner: SolutionPlanningRunner
+    code_generation_runner: CodeGenerationRunner
 
     def chat(
         self,
@@ -38,6 +45,7 @@ class AgentService(BaseModel):
         session_id: UUID,
         file_name: str,
         storage_uri: str,
+        dataset_summary: str,
     ):
         """..."""
         tasks = self.task_classification_runner.classify(question)
@@ -66,11 +74,27 @@ class AgentService(BaseModel):
             new_solutions="\n".join(solution_plans),
         )
 
-        return solution_plans
+        print("Solution plan:", solution_plans)
+
+        code = self.code_generation_runner.generate_code(
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+            dataset_summary=dataset_summary,
+            instructions=solution_plans,
+            dependencies=" ".join(
+                [dependency.get_avaliable_modules() for dependency in dependencies]
+            ),
+        )
+
+        return code
 
 
 agent_service = AgentService(
     task_classification_runner=tasks_classification_runner,
     subtask_classification_runner=subtasks_classification_runner,
     solution_planning_runner=solution_planning_runner,
+    code_generation_runner=code_generation_runner,
 )

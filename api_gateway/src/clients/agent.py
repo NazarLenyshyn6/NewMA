@@ -17,6 +17,7 @@ class AgentClient(BaseClient):
         session_id: UUID,
         file_name: str,
         storage_uri: str,
+        dataset_summary: str,
         url: str = "http://127.0.0.1:8005/api/v1/chat",
     ):
         """..."""
@@ -26,6 +27,7 @@ class AgentClient(BaseClient):
             "session_id": session_id,
             "file_name": file_name,
             "storage_uri": storage_uri,
+            "dataset_summary": dataset_summary,
         }
         response = requests.post(url=url, json=data)
         return AgentClient._handle_response(response)
