@@ -1,5 +1,6 @@
 """..."""
 
+from typing import Optional
 from uuid import UUID
 from dataclasses import dataclass
 import pickle
@@ -77,7 +78,7 @@ class ChatHistoryService:
             user_id=user_id,
             session_id=session_id,
             file_name=file_name,
-            solutions=pickle.dumps([]),
+            solutions=pickle.dumps(""),
             code=pickle.dumps([]),
             variables=pickle.dumps({"df": df}),
         )
@@ -98,26 +99,56 @@ class ChatHistoryService:
         user_id: int,
         session_id: UUID,
         file_name: str,
-        chat_history_update: ChatHistory,
     ) -> None:
         """..."""
 
-        # Apply updates to the chat history record in the database
-        ChatHistoryRepository.update_chat_history(
+        # Get chat history from cache
+        chat_history = self.chat_history_cache.get_chat_history(
+            session_id=session_id, file_name=file_name
+        )
+        if chat_history:
+
+            # Apply updates to the chat history record in the database
+            ChatHistoryRepository.update_chat_history(
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                chat_history_update=chat_history,
+            )
+
+    def update_chat_history_cache(
+        self,
+        db: Session,
+        user_id: int,
+        session_id: UUID,
+        file_name: str,
+        storage_uri: str,
+        solutions_update: Optional[bytes] = None,
+        code_update: Optional[bytes] = None,
+        variables_update: Optional[bytes] = None,
+    ):
+        """..."""
+        # Get current chat history
+        chat_history = self.get_chat_history(
             db=db,
             user_id=user_id,
             session_id=session_id,
             file_name=file_name,
-            chat_history_update=chat_history_update,
+            storage_uri=storage_uri,
         )
 
-        # Retrieve the updated chat history record from the database
-        db_chat_history = ChatHistoryRepository.get_chat_history(
-            db=db, user_id=user_id, session_id=session_id, file_name=file_name
-        )
-        chat_history = ChatHistory.model_validate(db_chat_history)
+        # Update chat history
+        if solutions_update is not None:
+            chat_history.solutions = solutions_update
 
-        # Update the cached chat history to reflect recent changes
+        if code_update is not None:
+            chat_history.code = code_update
+
+        if variables_update is not None:
+            chat_history.variables = variables_update
+
+        # Cache updated chat history
         self.chat_history_cache.cache_chat_history(
             session_id=session_id, file_name=file_name, chat_history=chat_history
         )
@@ -130,7 +161,7 @@ class ChatHistoryService:
             db=db, user_id=user_id, file_name=file_name
         )
 
-        # Delete from cache
+        # Delete from cache (TODO)
 
 
 chat_history_service = ChatHistoryService(chat_history_cache)

@@ -46,6 +46,7 @@ class SolutionPlanner(BaseModel):
             file_name=file_name,
             storage_uri=storage_uri,
         )
+        print("Solutions history:", solutions_history)
         generated_solution = self._solution_planning_chain.invoke(
             input={"question": question, "history": solutions_history}
         ).content

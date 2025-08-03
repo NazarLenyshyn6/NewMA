@@ -1,21 +1,28 @@
 """..."""
 
 from uuid import UUID
-from typing import List
 
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends
 
 from core.db import db_manager
-
-# from services.agent import agent_service
-
-router = APIRouter(prefix="/agent", tags=["Agent"])
+from schemas.agent import ChatRequest
+from services.agent import agent_service
 
 
-@router.post("/generate")
-def generate_response(
-    question: str, session_id: UUID, db: Session = Depends(db_manager.get_db)
+router = APIRouter(prefix="/chat", tags=["Chat"])
+
+
+@router.post("/")
+def chat(
+    chat_request: ChatRequest,
+    db: Session = Depends(db_manager.get_db),
 ):
-    return 1
-    # return agent_service.invoke(question=question, session_id=session_id, db=db)
+    return agent_service.chat(
+        question=chat_request.question,
+        db=db,
+        user_id=chat_request.user_id,
+        session_id=chat_request.session_id,
+        file_name=chat_request.file_name,
+        storage_uri=chat_request.storage_uri,
+    )
