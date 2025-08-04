@@ -697,7 +697,7 @@ const ChatPage: React.FC = () => {
   }, [messages, streamingMessage]);
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex relative">
+    <div className="h-screen bg-white flex relative">
       {/* Mobile backdrop */}
       {(leftSidebarOpen || rightSidebarOpen) && (
         <div 
@@ -711,43 +711,43 @@ const ChatPage: React.FC = () => {
       
       {/* Left Sidebar - Chat History */}
       <div className={`${
-        leftSidebarOpen ? 'w-72 md:w-72' : 'w-0'
-      } transition-all duration-500 ease-in-out overflow-hidden bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex flex-col ${
-        leftSidebarOpen ? 'fixed md:relative z-40 md:z-auto h-full shadow-2xl' : ''
-      } border-r border-slate-700/50`}>
+        leftSidebarOpen ? 'w-80 md:w-80' : 'w-0'
+      } transition-all duration-500 ease-in-out overflow-hidden bg-white flex flex-col ${
+        leftSidebarOpen ? 'fixed md:relative z-40 md:z-auto h-full shadow-xl' : ''
+      } border-r border-blue-100`}>
         {/* Sidebar Header */}
-        <div className="p-6 border-b border-slate-700/50 bg-slate-800/50">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                <Bot className="w-5 h-5 text-white" />
+        <div className="p-8 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-3xl flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                <Bot className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-white font-bold text-lg">ML Agent</h1>
-                <p className="text-slate-400 text-xs">Intelligent Data Assistant</p>
+                <h1 className="text-gray-800 font-bold text-xl">ML Agent</h1>
+                <p className="text-blue-600 text-sm font-medium">Intelligent Data Assistant</p>
               </div>
             </div>
             <button
               onClick={() => setLeftSidebarOpen(false)}
-              className="p-1.5 hover:bg-slate-700/50 rounded-lg transition-all duration-200 group"
+              className="p-2 hover:bg-blue-100 rounded-xl transition-all duration-200 group shadow-sm hover:shadow-md"
               title="Close sidebar"
             >
-              <X className="w-4 h-4 text-slate-400 group-hover:text-white" />
+              <X className="w-5 h-5 text-blue-400 group-hover:text-blue-600" />
             </button>
           </div>
           <button
             onClick={() => setShowNewSessionModal(true)}
-            className="w-full flex items-center justify-center space-x-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full flex items-center justify-center space-x-4 px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-2xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] hover:-translate-y-0.5"
           >
-            <Plus className="w-4 h-4" />
-            <span>New Chat</span>
-            <div className="w-1 h-1 bg-white/30 rounded-full"></div>
+            <Plus className="w-5 h-5" />
+            <span className="text-base">New Chat</span>
+            <div className="w-2 h-2 bg-white/40 rounded-full animate-pulse"></div>
           </button>
         </div>
 
         {/* Chat Sessions */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          <div className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-4 px-2">
+        <div className="flex-1 overflow-y-auto p-6 space-y-3">
+          <div className="text-blue-600 text-sm font-semibold uppercase tracking-wider mb-6 px-3">
             Recent Conversations
           </div>
           {sessions.map((session, index) => (
@@ -756,25 +756,25 @@ const ChatPage: React.FC = () => {
               className="opacity-0 animate-fade-in"
               style={{ animationDelay: `${index * 0.05}s`, animationFillMode: 'forwards' }}
             >
-              <div className={`w-full text-left p-4 rounded-2xl transition-all duration-300 group relative overflow-hidden ${
+              <div className={`w-full text-left p-5 rounded-2xl transition-all duration-300 group relative overflow-hidden shadow-md hover:shadow-lg ${
                 currentSession?.id === session.id
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg transform scale-[1.02]'
-                  : 'text-slate-300 hover:bg-slate-800/70 hover:text-white hover:shadow-lg hover:transform hover:scale-[1.01]'
-              } backdrop-blur-sm border border-slate-700/30 hover:border-slate-600/50`}>
-                <div className="flex items-center space-x-3">
-                  <div className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                  ? 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-900 border-2 border-blue-200 transform scale-[1.02] shadow-lg'
+                  : 'bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-900 hover:shadow-xl hover:transform hover:scale-[1.01] hover:-translate-y-1 border border-gray-200 hover:border-blue-200'
+              }`}>
+                <div className="flex items-center space-x-4">
+                  <div className={`w-3 h-3 rounded-full transition-all duration-300 shadow-sm ${
                     currentSession?.id === session.id 
-                      ? 'bg-white shadow-lg' 
-                      : 'bg-slate-500 group-hover:bg-blue-400'
+                      ? 'bg-blue-500 shadow-lg animate-pulse' 
+                      : 'bg-gray-400 group-hover:bg-blue-400'
                   }`} />
                   <div 
                     className="min-w-0 flex-1 cursor-pointer"
                     onClick={() => switchSession(session)}
                   >
-                    <span className="text-sm font-medium truncate block leading-5">
+                    <span className="text-base font-semibold truncate block leading-6">
                       {session.title}
                     </span>
-                    <span className="text-xs opacity-70 truncate block">
+                    <span className="text-sm opacity-75 truncate block font-medium">
                       {new Date(session.created_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -783,14 +783,18 @@ const ChatPage: React.FC = () => {
                       })}
                     </span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <MessageSquare className="w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity" />
+                  <div className="flex items-center space-x-3">
+                    <MessageSquare className={`w-5 h-5 transition-all duration-200 ${
+                      currentSession?.id === session.id 
+                        ? 'text-blue-600' 
+                        : 'text-gray-400 group-hover:text-blue-500'
+                    }`} />
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteSession(session);
                       }}
-                      className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-400 transition-all duration-200"
+                      className="p-2 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-500 transition-all duration-200 shadow-sm hover:shadow-md hover:scale-110"
                       title="Delete session"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -800,7 +804,7 @@ const ChatPage: React.FC = () => {
                 
                 {/* Active session indicator */}
                 {currentSession?.id === session.id && (
-                  <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-white rounded-r-full shadow-lg" />
+                  <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1.5 h-10 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-r-full shadow-lg" />
                 )}
               </div>
             </div>
@@ -808,148 +812,148 @@ const ChatPage: React.FC = () => {
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-6 border-t border-slate-700/50 bg-slate-800/30">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-slate-600 to-slate-700 rounded-2xl flex items-center justify-center shadow-lg">
-              <User className="w-5 h-5 text-slate-300" />
+        <div className="p-6 border-t border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-sm">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+              <User className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-white font-medium text-sm">User</div>
-              <div className="text-slate-400 text-xs">Free Plan</div>
+              <div className="text-gray-800 font-semibold text-base">User</div>
+              <div className="text-blue-600 text-sm font-medium">Free Plan</div>
             </div>
             <button
               onClick={handleLogout}
-              className="p-2 hover:bg-slate-700 rounded-xl transition-all duration-200 text-slate-400 hover:text-white group"
+              className="p-3 hover:bg-red-100 rounded-xl transition-all duration-200 text-gray-500 hover:text-red-600 group shadow-sm hover:shadow-md hover:scale-110"
               title="Sign out"
             >
-              <LogOut className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform" />
             </button>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col bg-white/70 backdrop-blur-sm">
+      <div className="flex-1 flex flex-col bg-white">
         {/* Header */}
-        <div className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 px-6 py-4 flex items-center justify-between shadow-sm">
+        <div className="bg-white border-b border-blue-100 px-8 py-5 flex items-center justify-between shadow-md">
           <div className="flex items-center space-x-4">
             {!leftSidebarOpen && (
               <button
                 onClick={() => setLeftSidebarOpen(true)}
-                className="p-2.5 hover:bg-slate-100 rounded-2xl transition-all duration-200 group"
+                className="p-3 hover:bg-blue-100 rounded-2xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-105"
               >
-                <Menu className="w-5 h-5 text-slate-600 group-hover:text-slate-800" />
+                <Menu className="w-6 h-6 text-blue-500 group-hover:text-blue-700" />
               </button>
             )}
-            <div className="flex items-center space-x-3">
-              <h1 className="text-xl font-bold text-slate-800">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-2xl font-bold text-gray-800">
                 {currentSession?.title || 'ML Agent'}
               </h1>
               {activeFile && (
-                <div className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 rounded-2xl text-sm font-medium shadow-sm border border-emerald-200/50">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                  <File className="w-3.5 h-3.5" />
-                  <span className="font-semibold">{activeFile.file_name}</span>
+                <div className="flex items-center space-x-3 px-4 py-2.5 bg-gradient-to-r from-emerald-50 to-green-50 text-emerald-700 rounded-2xl text-base font-semibold shadow-lg border-2 border-emerald-200 hover:shadow-xl transition-all duration-300 hover:scale-105">
+                  <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse shadow-sm"></div>
+                  <File className="w-4 h-4" />
+                  <span>{activeFile.file_name}</span>
                 </div>
               )}
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3">
             <button
               onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-              className={`p-2.5 rounded-2xl transition-all duration-200 group ${
+              className={`p-3 rounded-2xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-105 ${
                 rightSidebarOpen 
-                  ? 'bg-blue-100 text-blue-600' 
-                  : 'hover:bg-slate-100 text-slate-600 hover:text-slate-800'
+                  ? 'bg-blue-100 text-blue-600 shadow-md' 
+                  : 'hover:bg-blue-100 text-blue-500 hover:text-blue-700'
               }`}
               title="Dataset Files"
             >
-              <PaperclipIcon className="w-5 h-5" />
+              <PaperclipIcon className="w-6 h-6" />
             </button>
             {leftSidebarOpen && (
               <button
                 onClick={() => setLeftSidebarOpen(false)}
-                className="p-2.5 hover:bg-slate-100 rounded-2xl transition-all duration-200 group"
+                className="p-3 hover:bg-blue-100 rounded-2xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-105"
                 title="Close sidebar"
               >
-                <X className="w-5 h-5 text-slate-600 group-hover:text-slate-800" />
+                <X className="w-6 h-6 text-blue-500 group-hover:text-blue-700" />
               </button>
             )}
           </div>
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto bg-gradient-to-b from-slate-50/50 to-white/80">
+        <div className="flex-1 overflow-y-auto bg-gradient-to-b from-blue-50/30 to-white p-4">
           {!currentSession ? (
-            <div className="h-full flex items-center justify-center p-8">
-              <div className="text-center max-w-2xl">
-                <div className="mb-8">
-                  <div className="w-20 h-20 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl animate-pulse">
-                    <Bot className="w-10 h-10 text-white" />
+            <div className="h-full flex items-center justify-center p-12">
+              <div className="text-center max-w-3xl bg-white rounded-3xl p-12 shadow-xl border border-blue-100">
+                <div className="mb-10">
+                  <div className="w-24 h-24 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 animate-pulse">
+                    <Bot className="w-12 h-12 text-white" />
                   </div>
-                  <h2 className="text-4xl font-bold text-slate-800 mb-4">
+                  <h2 className="text-5xl font-bold text-gray-800 mb-6">
                     Welcome to <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">ML Agent</span>
                   </h2>
-                  <p className="text-xl text-slate-600 mb-8 leading-relaxed">
+                  <p className="text-xl text-gray-600 mb-10 leading-relaxed font-medium">
                     Your independent AI assistant for advanced data analysis, insights, and machine learning solutions
                   </p>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                  <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-slate-200/50 hover:shadow-xl transition-all duration-300 hover:scale-105">
-                    <div className="w-12 h-12 bg-gradient-to-r from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-                      <Database className="w-6 h-6 text-white" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                  <div className="bg-white rounded-3xl p-8 shadow-xl border-2 border-blue-100 hover:shadow-2xl transition-all duration-300 hover:scale-105 hover:-translate-y-2">
+                    <div className="w-16 h-16 bg-gradient-to-r from-amber-400 to-orange-500 rounded-3xl flex items-center justify-center mb-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110">
+                      <Database className="w-8 h-8 text-white" />
                     </div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-2">Data Analysis</h3>
-                    <p className="text-slate-600 text-sm">Upload your datasets and get instant insights, visualizations, and statistical analysis</p>
+                    <h3 className="text-xl font-bold text-gray-800 mb-3">Data Analysis</h3>
+                    <p className="text-gray-600 text-base font-medium">Upload your datasets and get instant insights, visualizations, and statistical analysis</p>
                   </div>
                   
-                  <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-slate-200/50 hover:shadow-xl transition-all duration-300 hover:scale-105">
-                    <div className="w-12 h-12 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-                      <Zap className="w-6 h-6 text-white" />
+                  <div className="bg-white rounded-3xl p-8 shadow-xl border-2 border-blue-100 hover:shadow-2xl transition-all duration-300 hover:scale-105 hover:-translate-y-2">
+                    <div className="w-16 h-16 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-3xl flex items-center justify-center mb-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110">
+                      <Zap className="w-8 h-8 text-white" />
                     </div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-2">Smart Insights</h3>
-                    <p className="text-slate-600 text-sm">AI-powered recommendations and predictive analytics for your business decisions</p>
+                    <h3 className="text-xl font-bold text-gray-800 mb-3">Smart Insights</h3>
+                    <p className="text-gray-600 text-base font-medium">AI-powered recommendations and predictive analytics for your business decisions</p>
                   </div>
                 </div>
                 
                 <button
                   onClick={() => setShowNewSessionModal(true)}
-                  className="inline-flex items-center space-x-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-2xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 active:scale-95"
+                  className="inline-flex items-center space-x-4 px-10 py-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-lg rounded-3xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 active:scale-95 hover:-translate-y-1"
                 >
-                  <Plus className="w-5 h-5" />
+                  <Plus className="w-6 h-6" />
                   <span>Start New Conversation</span>
-                  <ArrowRight className="w-5 h-5" />
+                  <ArrowRight className="w-6 h-6" />
                 </button>
               </div>
             </div>
           ) : (
-            <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+            <div className="max-w-5xl mx-auto px-8 py-10 space-y-10">
               {messages.map((message, index) => (
                 <div 
                   key={message.id} 
                   className="opacity-0 animate-fade-in"
                   style={{ animationDelay: `${index * 0.1}s`, animationFillMode: 'forwards' }}
                 >
-                  <div className={`flex items-start space-x-4 ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg ${
+                  <div className={`flex items-start space-x-6 ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                    <div className={`w-12 h-12 rounded-3xl flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-110 ${
                       message.role === 'user' 
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600' 
+                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600' 
                         : 'bg-gradient-to-r from-emerald-500 to-teal-600'
                     }`}>
                       {message.role === 'user' ? (
-                        <User className="w-5 h-5 text-white" />
+                        <User className="w-6 h-6 text-white" />
                       ) : (
-                        <Bot className="w-5 h-5 text-white" />
+                        <Bot className="w-6 h-6 text-white" />
                       )}
                     </div>
                     <div className={`flex-1 min-w-0 ${message.role === 'user' ? 'text-right' : ''}`}>
-                      <div className="flex items-center space-x-2 mb-3">
-                        <span className="text-sm font-bold text-slate-700">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <span className="text-base font-bold text-gray-700">
                           {message.role === 'user' ? 'You' : 'ML Agent'}
                         </span>
-                        <span className="text-xs text-slate-400">
+                        <span className="text-sm text-blue-500 font-medium">
                           {new Date(message.timestamp).toLocaleTimeString('en-US', {
                             hour: '2-digit',
                             minute: '2-digit'
@@ -958,10 +962,10 @@ const ChatPage: React.FC = () => {
                       </div>
                       <div className={`${
                         message.role === 'user'
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-3xl rounded-br-lg shadow-lg px-6 py-4'
-                          : 'bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl rounded-bl-lg shadow-lg overflow-hidden'
+                          ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-3xl rounded-br-lg shadow-xl px-8 py-6 hover:shadow-2xl transition-all duration-300'
+                          : 'bg-white border-2 border-blue-100 rounded-3xl rounded-bl-lg shadow-xl px-8 py-6 hover:shadow-2xl transition-all duration-300 overflow-hidden'
                       }`}>
-                        <div className={`${message.role === 'user' ? 'text-white' : 'text-slate-800'}`}>
+                        <div className={`text-base leading-relaxed ${message.role === 'user' ? 'text-white' : 'text-gray-800'}`}>
                           {renderMessageContent(message.content, message.id)}
                         </div>
                       </div>
@@ -973,23 +977,23 @@ const ChatPage: React.FC = () => {
               {/* Streaming message */}
               {isLoading && streamingMessage && (
                 <div className="animate-fade-in">
-                  <div className="flex items-start space-x-4">
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg relative">
-                      <Bot className="w-5 h-5 text-white" />
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-ping"></div>
+                  <div className="flex items-start space-x-6">
+                    <div className="w-12 h-12 rounded-3xl bg-gradient-to-r from-emerald-500 to-teal-600 flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-110 relative">
+                      <Bot className="w-6 h-6 text-white" />
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full animate-ping shadow-lg"></div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-3 mb-3">
-                        <span className="text-sm font-bold text-slate-700">ML Agent</span>
-                        <div className="flex items-center space-x-2 px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
-                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                      <div className="flex items-center space-x-4 mb-4">
+                        <span className="text-base font-bold text-gray-700">ML Agent</span>
+                        <div className="flex items-center space-x-2 px-3 py-2 bg-emerald-100 text-emerald-700 rounded-2xl text-sm font-semibold shadow-md">
+                          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
                           <span>Streaming</span>
                         </div>
                       </div>
-                      <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl rounded-bl-lg shadow-lg overflow-hidden">
-                        <div className="text-slate-800 p-6">
+                      <div className="bg-white border-2 border-blue-100 rounded-3xl rounded-bl-lg shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden">
+                        <div className="text-gray-800 p-8 text-base leading-relaxed">
                           {renderMessageContent(streamingMessage, 'streaming')}
                           <span className="inline-block w-2 h-5 bg-emerald-500 animate-pulse ml-1 rounded-sm">▋</span>
                         </div>
@@ -1032,10 +1036,10 @@ const ChatPage: React.FC = () => {
 
         {/* Input Area */}
         {currentSession && (
-          <div className="border-t border-slate-200/60 bg-white/80 backdrop-blur-md p-6">
-            <div className="max-w-4xl mx-auto">
+          <div className="border-t border-blue-100 bg-white shadow-lg p-8">
+            <div className="max-w-5xl mx-auto">
               <div className="relative">
-                <div className="flex items-end space-x-4 bg-white/90 backdrop-blur-sm rounded-3xl border border-slate-200/60 shadow-lg p-2 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500/50 transition-all duration-200">
+                <div className="flex items-end space-x-6 bg-white rounded-3xl border-2 border-blue-100 shadow-xl p-4 focus-within:ring-4 focus-within:ring-blue-500/20 focus-within:border-blue-400 transition-all duration-300 hover:shadow-2xl">
                   <div className="flex-1">
                     <textarea
                       value={inputMessage}
@@ -1047,7 +1051,7 @@ const ChatPage: React.FC = () => {
                         }
                       }}
                       placeholder={`Ask ML Agent${activeFile ? ` about ${activeFile.file_name}` : ' anything about your data'}...`}
-                      className="w-full p-4 bg-transparent border-none resize-none focus:outline-none text-slate-800 placeholder-slate-500 text-base leading-6"
+                      className="w-full p-6 bg-transparent border-none resize-none focus:outline-none text-gray-800 placeholder-gray-500 text-lg leading-7 font-medium"
                       rows={1}
                       style={{ minHeight: '24px', maxHeight: '160px' }}
                       onInput={(e) => {
@@ -1061,16 +1065,16 @@ const ChatPage: React.FC = () => {
                   <button
                     onClick={sendMessage}
                     disabled={!inputMessage.trim() || isLoading}
-                    className={`p-3 rounded-2xl transition-all duration-200 shadow-lg ${
+                    className={`p-4 rounded-2xl transition-all duration-300 shadow-xl ${
                       inputMessage.trim() && !isLoading
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-blue-500/25 hover:shadow-blue-500/40 transform hover:scale-105 active:scale-95'
-                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-blue-500/30 hover:shadow-blue-500/50 transform hover:scale-110 active:scale-95 hover:-translate-y-1'
+                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     }`}
                   >
                     {isLoading ? (
-                      <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                      <div className="w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
                     ) : (
-                      <Send className="w-5 h-5" />
+                      <Send className="w-6 h-6" />
                     )}
                   </button>
                 </div>
@@ -1099,111 +1103,111 @@ const ChatPage: React.FC = () => {
 
       {/* Right Sidebar - Files */}
       <div className={`${
-        rightSidebarOpen ? 'w-96 md:w-96' : 'w-0'
-      } transition-all duration-500 ease-in-out overflow-hidden bg-gradient-to-b from-slate-50 to-white border-l border-slate-200/60 flex flex-col ${
-        rightSidebarOpen ? 'fixed md:relative z-40 md:z-auto right-0 h-full shadow-2xl' : ''
+        rightSidebarOpen ? 'w-[420px] md:w-[420px]' : 'w-0'
+      } transition-all duration-500 ease-in-out overflow-hidden bg-white border-l border-blue-100 flex flex-col ${
+        rightSidebarOpen ? 'fixed md:relative z-40 md:z-auto right-0 h-full shadow-xl' : ''
       }`}>
         {/* Files Header */}
-        <div className="p-6 border-b border-slate-200/60 bg-white/80 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                <Database className="w-5 h-5 text-white" />
+        <div className="p-8 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-sm">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                <Database className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-slate-800">Dataset Files</h2>
-                <p className="text-xs text-slate-500">
+                <h2 className="text-2xl font-bold text-gray-800">Dataset Files</h2>
+                <p className="text-sm text-blue-600 font-medium">
                   {files.length} file{files.length !== 1 ? 's' : ''} available
                 </p>
               </div>
             </div>
             <button
               onClick={() => setRightSidebarOpen(false)}
-              className="p-2 hover:bg-slate-100 rounded-2xl transition-all duration-200 group"
+              className="p-2.5 hover:bg-blue-100 rounded-xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-110"
             >
-              <X className="w-5 h-5 text-slate-600 group-hover:text-slate-800" />
+              <X className="w-6 h-6 text-blue-500 group-hover:text-blue-700" />
             </button>
           </div>
           <button
             onClick={() => setShowUploadModal(true)}
-            className="w-full flex items-center justify-center space-x-3 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full flex items-center justify-center space-x-4 px-6 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-2xl transition-all duration-300 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] hover:-translate-y-0.5"
           >
-            <Upload className="w-4 h-4" />
+            <Upload className="w-5 h-5" />
             <span>Upload Dataset</span>
-            <div className="w-1 h-1 bg-white/30 rounded-full"></div>
+            <div className="w-2 h-2 bg-white/40 rounded-full animate-pulse"></div>
           </button>
         </div>
 
         {/* Files List */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-8 space-y-6">
           {loadingFiles ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-slate-600 font-medium">Loading datasets...</p>
+            <div className="flex items-center justify-center py-16">
+              <div className="flex flex-col items-center space-y-6">
+                <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin shadow-lg"></div>
+                <p className="text-gray-600 font-semibold text-lg">Loading datasets...</p>
               </div>
             </div>
           ) : files.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                <FileText className="w-8 h-8 text-slate-400" />
+            <div className="text-center py-16">
+              <div className="w-20 h-20 bg-blue-100 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-lg">
+                <FileText className="w-10 h-10 text-blue-500" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">No datasets yet</h3>
-              <p className="text-slate-500 text-sm leading-relaxed">
+              <h3 className="text-xl font-bold text-gray-700 mb-4">No datasets yet</h3>
+              <p className="text-gray-500 text-base leading-relaxed font-medium">
                 Upload your first dataset to start analyzing data with ML Agent
               </p>
             </div>
           ) : (
             <>
-              <div className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-4 px-2">
+              <div className="text-blue-600 text-sm font-semibold uppercase tracking-wider mb-6 px-3">
                 Available Datasets
               </div>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {files.map((file, index) => (
                   <div
                     key={file.file_name}
                     className="opacity-0 animate-fade-in"
                     style={{ animationDelay: `${index * 0.05}s`, animationFillMode: 'forwards' }}
                   >
-                    <div className={`group relative p-4 rounded-2xl border transition-all duration-300 overflow-hidden ${
+                    <div className={`group relative p-6 rounded-3xl border-2 transition-all duration-300 overflow-hidden shadow-md hover:shadow-xl ${
                         activeFile?.file_name === file.file_name
-                          ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200 shadow-lg transform scale-[1.02]'
-                          : 'bg-white/80 backdrop-blur-sm border-slate-200/60 hover:border-slate-300 hover:shadow-lg hover:bg-white hover:transform hover:scale-[1.01]'
+                          ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-300 shadow-lg transform scale-[1.02]'
+                          : 'bg-white border-blue-100 hover:border-blue-200 hover:shadow-xl hover:bg-blue-50/30 hover:transform hover:scale-[1.02] hover:-translate-y-1'
                       }`}
                     >
-                      <div className="flex items-start space-x-4">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-md transition-all duration-300 ${
+                      <div className="flex items-start space-x-5">
+                        <div className={`w-14 h-14 rounded-3xl flex items-center justify-center shadow-lg transition-all duration-300 hover:scale-110 ${
                           activeFile?.file_name === file.file_name 
-                            ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white' 
-                            : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
+                            ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-emerald-500/30' 
+                            : 'bg-blue-100 text-blue-600 group-hover:bg-blue-200 group-hover:text-blue-700'
                         }`}>
-                          <File className="w-6 h-6" />
+                          <File className="w-7 h-7" />
                         </div>
                         <div 
                           className="flex-1 min-w-0 cursor-pointer"
                           onClick={() => currentSession && setActiveFileForSession(file.file_name || '')}
                         >
-                          <div className="flex items-center space-x-2 mb-1">
-                            <span className="font-bold text-slate-800 truncate">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <span className="font-bold text-gray-800 truncate text-base">
                               {file.file_name}
                             </span>
                             {activeFile?.file_name === file.file_name && (
-                              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                              <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse shadow-md"></div>
                             )}
                           </div>
                           {file.description && (
-                            <p className="text-sm text-slate-600 truncate mb-2 leading-5">
+                            <p className="text-base text-gray-600 truncate mb-3 leading-6 font-medium">
                               {file.description}
                             </p>
                           )}
-                          <div className="flex items-center space-x-3 text-xs">
+                          <div className="flex items-center space-x-4 text-sm">
                             {file.size && (
-                              <span className="text-slate-500 font-medium">
+                              <span className="text-gray-500 font-semibold">
                                 {(file.size / 1024 / 1024).toFixed(1)} MB
                               </span>
                             )}
                             {file.upload_time && (
-                              <span className="text-slate-400">
+                              <span className="text-blue-500 font-medium">
                                 {new Date(file.upload_time).toLocaleDateString('en-US', {
                                   month: 'short',
                                   day: 'numeric'
@@ -1212,26 +1216,26 @@ const ChatPage: React.FC = () => {
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-3">
                           {settingActiveFile === file.file_name && (
-                            <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-6 h-6 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin shadow-md"></div>
                           )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               deleteFile(file);
                             }}
-                            className="p-2 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-500 transition-all duration-200"
+                            className="p-2.5 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-500 transition-all duration-200 shadow-sm hover:shadow-md hover:scale-110"
                             title="Delete file"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-5 h-5" />
                           </button>
                         </div>
                       </div>
                       
                       {/* Active indicator */}
                       {activeFile?.file_name === file.file_name && (
-                        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-12 bg-emerald-500 rounded-r-full shadow-lg"></div>
+                        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-2 h-16 bg-gradient-to-b from-emerald-500 to-green-600 rounded-r-full shadow-lg"></div>
                       )}
                     </div>
                   </div>
