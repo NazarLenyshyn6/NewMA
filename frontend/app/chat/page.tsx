@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2 } from 'lucide-react';
 
 interface Session {
   id: string;
@@ -28,6 +29,7 @@ interface FileItem {
 }
 
 const ChatPage: React.FC = () => {
+  const router = useRouter();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -51,11 +53,43 @@ const ChatPage: React.FC = () => {
   const [activeFile, setActiveFile] = useState<FileItem | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [streamingMessage, setStreamingMessage] = useState('');
+  const [showDeleteSessionModal, setShowDeleteSessionModal] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
+  const [showDeleteFileModal, setShowDeleteFileModal] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<FileItem | null>(null);
+  const [deletingSession, setDeletingSession] = useState(false);
+  const [deletingFile, setDeletingFile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Debug mode for development
   const DEBUG_STREAMING = process.env.NODE_ENV === 'development';
+
+  // Logout function
+  const handleLogout = useCallback(() => {
+    try {
+      // Clear all localStorage data
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('token_type');
+      localStorage.removeItem('activeSessionId');
+      localStorage.removeItem('activeSessionTitle');
+      
+      // Clear all state
+      setSessions([]);
+      setCurrentSession(null);
+      setMessages([]);
+      setFiles([]);
+      setActiveFile(null);
+      setInputMessage('');
+      
+      // Redirect to login page
+      router.push('/login');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Fallback to window.location if router fails
+      window.location.href = '/login';
+    }
+  }, [router]);
 
   // Get auth headers
   const getAuthHeaders = () => {
@@ -66,6 +100,16 @@ const ChatPage: React.FC = () => {
       'Content-Type': 'application/json',
     };
   };
+
+  // Check if response indicates authentication failure
+  const handleAuthError = useCallback((response: Response) => {
+    if (response.status === 401 || response.status === 403) {
+      console.log('Authentication failed, redirecting to login');
+      handleLogout();
+      return true;
+    }
+    return false;
+  }, [handleLogout]);
 
   // Copy code to clipboard
   const copyToClipboard = async (code: string, codeId: string) => {
@@ -190,6 +234,8 @@ const ChatPage: React.FC = () => {
         headers: getAuthHeaders(),
       });
 
+      if (handleAuthError(response)) return;
+
       if (response.ok) {
         const data = await response.json();
         setSessions(data);
@@ -199,7 +245,7 @@ const ChatPage: React.FC = () => {
     } catch (error) {
       console.error('Error loading sessions:', error);
     }
-  }, []);
+  }, [handleAuthError]);
 
   // Load files from API
   const loadFiles = useCallback(async () => {
@@ -407,6 +453,87 @@ const ChatPage: React.FC = () => {
     }
   };
 
+  // Delete session
+  const deleteSession = async (session: Session) => {
+    setSessionToDelete(session);
+    setShowDeleteSessionModal(true);
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!sessionToDelete) return;
+
+    setDeletingSession(true);
+    try {
+      // Based on UI requirements: DELETE to /api/v1/gateway/sessions/{title}
+      const response = await fetch(`http://localhost:8003/api/v1/gateway/sessions/${sessionToDelete.title}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        // Remove session from list
+        setSessions(prev => prev.filter(s => s.id !== sessionToDelete.id));
+        
+        // If this was the current session, switch to another or clear
+        if (currentSession?.id === sessionToDelete.id) {
+          const remainingSessions = sessions.filter(s => s.id !== sessionToDelete.id);
+          if (remainingSessions.length > 0) {
+            await switchSession(remainingSessions[0]);
+          } else {
+            setCurrentSession(null);
+            setMessages([]);
+            setActiveFile(null);
+          }
+        }
+      } else {
+        console.error('Failed to delete session');
+      }
+    } catch (error) {
+      console.error('Error deleting session:', error);
+    } finally {
+      setDeletingSession(false);
+      setShowDeleteSessionModal(false);
+      setSessionToDelete(null);
+    }
+  };
+
+  // Delete file
+  const deleteFile = async (file: FileItem) => {
+    setFileToDelete(file);
+    setShowDeleteFileModal(true);
+  };
+
+  const confirmDeleteFile = async () => {
+    if (!fileToDelete) return;
+
+    setDeletingFile(true);
+    try {
+      // Based on UI requirements: DELETE to /api/v1/gateway/files/{file_name}
+      const response = await fetch(`http://localhost:8003/api/v1/gateway/files/${fileToDelete.file_name}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        // Remove file from list
+        setFiles(prev => prev.filter(f => f.file_name !== fileToDelete.file_name));
+        
+        // If this was the active file, clear it
+        if (activeFile?.file_name === fileToDelete.file_name) {
+          setActiveFile(null);
+        }
+      } else {
+        console.error('Failed to delete file');
+      }
+    } catch (error) {
+      console.error('Error deleting file:', error);
+    } finally {
+      setDeletingFile(false);
+      setShowDeleteFileModal(false);
+      setFileToDelete(null);
+    }
+  };
+
   // Send message with streaming
   const sendMessage = async () => {
     if (!inputMessage.trim() || !currentSession || isLoading) return;
@@ -437,6 +564,11 @@ const ChatPage: React.FC = () => {
       if (DEBUG_STREAMING) {
         console.log('Stream response status:', response.status, 'OK:', response.ok);
         console.log('Stream response headers:', Object.fromEntries(response.headers.entries()));
+      }
+
+      if (handleAuthError(response)) {
+        setIsLoading(false);
+        return;
       }
 
       if (response.ok && response.body) {
@@ -545,12 +677,12 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     if (!token) {
-      window.location.href = '/login';
+      router.push('/login');
       return;
     }
     
     initializeSessions();
-  }, [initializeSessions]);
+  }, [initializeSessions, router]);
 
   // Restore active session after sessions are loaded
   useEffect(() => {
@@ -565,11 +697,11 @@ const ChatPage: React.FC = () => {
   }, [messages, streamingMessage]);
 
   return (
-    <div className="h-screen bg-white flex relative">
+    <div className="h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex relative">
       {/* Mobile backdrop */}
       {(leftSidebarOpen || rightSidebarOpen) && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden transition-all duration-300"
           onClick={() => {
             setLeftSidebarOpen(false);
             setRightSidebarOpen(false);
@@ -579,139 +711,259 @@ const ChatPage: React.FC = () => {
       
       {/* Left Sidebar - Chat History */}
       <div className={`${
-        leftSidebarOpen ? 'w-64 md:w-64' : 'w-0'
-      } transition-all duration-300 ease-in-out overflow-hidden bg-gray-900 flex flex-col ${
-        leftSidebarOpen ? 'fixed md:relative z-40 md:z-auto h-full' : ''
-      }`}>
+        leftSidebarOpen ? 'w-72 md:w-72' : 'w-0'
+      } transition-all duration-500 ease-in-out overflow-hidden bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex flex-col ${
+        leftSidebarOpen ? 'fixed md:relative z-40 md:z-auto h-full shadow-2xl' : ''
+      } border-r border-slate-700/50`}>
         {/* Sidebar Header */}
-        <div className="p-4 border-b border-gray-700">
+        <div className="p-6 border-b border-slate-700/50 bg-slate-800/50">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Bot className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-white font-bold text-lg">ML Agent</h1>
+                <p className="text-slate-400 text-xs">Intelligent Data Assistant</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setLeftSidebarOpen(false)}
+              className="p-1.5 hover:bg-slate-700/50 rounded-lg transition-all duration-200 group"
+              title="Close sidebar"
+            >
+              <X className="w-4 h-4 text-slate-400 group-hover:text-white" />
+            </button>
+          </div>
           <button
             onClick={() => setShowNewSessionModal(true)}
-            className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-white text-gray-900 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+            className="w-full flex items-center justify-center space-x-3 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
           >
             <Plus className="w-4 h-4" />
-            <span>New chat</span>
+            <span>New Chat</span>
+            <div className="w-1 h-1 bg-white/30 rounded-full"></div>
           </button>
         </div>
 
         {/* Chat Sessions */}
-        <div className="flex-1 overflow-y-auto p-2">
-          {sessions.map((session) => (
-            <button
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          <div className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-4 px-2">
+            Recent Conversations
+          </div>
+          {sessions.map((session, index) => (
+            <div
               key={session.id}
-              onClick={() => switchSession(session)}
-              className={`w-full text-left p-3 rounded-lg mb-1 transition-colors group relative ${
-                currentSession?.id === session.id
-                  ? 'bg-gray-800 text-white'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              }`}
+              className="opacity-0 animate-fade-in"
+              style={{ animationDelay: `${index * 0.05}s`, animationFillMode: 'forwards' }}
             >
-              <div className="flex items-center space-x-3">
-                <MessageSquare className="w-4 h-4 flex-shrink-0" />
-                <span className="truncate text-sm">{session.title}</span>
+              <div className={`w-full text-left p-4 rounded-2xl transition-all duration-300 group relative overflow-hidden ${
+                currentSession?.id === session.id
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg transform scale-[1.02]'
+                  : 'text-slate-300 hover:bg-slate-800/70 hover:text-white hover:shadow-lg hover:transform hover:scale-[1.01]'
+              } backdrop-blur-sm border border-slate-700/30 hover:border-slate-600/50`}>
+                <div className="flex items-center space-x-3">
+                  <div className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                    currentSession?.id === session.id 
+                      ? 'bg-white shadow-lg' 
+                      : 'bg-slate-500 group-hover:bg-blue-400'
+                  }`} />
+                  <div 
+                    className="min-w-0 flex-1 cursor-pointer"
+                    onClick={() => switchSession(session)}
+                  >
+                    <span className="text-sm font-medium truncate block leading-5">
+                      {session.title}
+                    </span>
+                    <span className="text-xs opacity-70 truncate block">
+                      {new Date(session.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <MessageSquare className="w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity" />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteSession(session);
+                      }}
+                      className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-400 transition-all duration-200"
+                      title="Delete session"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Active session indicator */}
+                {currentSession?.id === session.id && (
+                  <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-white rounded-r-full shadow-lg" />
+                )}
               </div>
-            </button>
+            </div>
           ))}
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-gray-700">
-          <div className="flex items-center space-x-3 text-gray-300">
-            <User className="w-8 h-8 bg-gray-700 rounded-full p-2" />
+        <div className="p-6 border-t border-slate-700/50 bg-slate-800/30">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-r from-slate-600 to-slate-700 rounded-2xl flex items-center justify-center shadow-lg">
+              <User className="w-5 h-5 text-slate-300" />
+            </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">User</div>
+              <div className="text-white font-medium text-sm">User</div>
+              <div className="text-slate-400 text-xs">Free Plan</div>
             </div>
             <button
-              onClick={() => {
-                localStorage.clear();
-                window.location.href = '/login';
-              }}
-              className="p-1 hover:bg-gray-700 rounded"
+              onClick={handleLogout}
+              className="p-2 hover:bg-slate-700 rounded-xl transition-all duration-200 text-slate-400 hover:text-white group"
+              title="Sign out"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-4 h-4 group-hover:scale-110 transition-transform" />
             </button>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col bg-white/70 backdrop-blur-sm">
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+        <div className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 px-6 py-4 flex items-center justify-between shadow-sm">
+          <div className="flex items-center space-x-4">
             {!leftSidebarOpen && (
               <button
                 onClick={() => setLeftSidebarOpen(true)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2.5 hover:bg-slate-100 rounded-2xl transition-all duration-200 group"
               >
-                <Menu className="w-5 h-5" />
+                <Menu className="w-5 h-5 text-slate-600 group-hover:text-slate-800" />
               </button>
             )}
-            <h1 className="text-lg font-semibold text-gray-900">
-              {currentSession?.title || 'ML Agent'}
-            </h1>
-            {activeFile && (
-              <div className="flex items-center space-x-2 px-2 py-1 bg-green-100 text-green-800 rounded-md text-sm">
-                <File className="w-3 h-3" />
-                <span>{activeFile.file_name}</span>
-              </div>
-            )}
+            <div className="flex items-center space-x-3">
+              <h1 className="text-xl font-bold text-slate-800">
+                {currentSession?.title || 'ML Agent'}
+              </h1>
+              {activeFile && (
+                <div className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 rounded-2xl text-sm font-medium shadow-sm border border-emerald-200/50">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                  <File className="w-3.5 h-3.5" />
+                  <span className="font-semibold">{activeFile.file_name}</span>
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className={`p-2.5 rounded-2xl transition-all duration-200 group ${
+                rightSidebarOpen 
+                  ? 'bg-blue-100 text-blue-600' 
+                  : 'hover:bg-slate-100 text-slate-600 hover:text-slate-800'
+              }`}
+              title="Dataset Files"
             >
               <PaperclipIcon className="w-5 h-5" />
             </button>
             {leftSidebarOpen && (
               <button
                 onClick={() => setLeftSidebarOpen(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2.5 hover:bg-slate-100 rounded-2xl transition-all duration-200 group"
+                title="Close sidebar"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-slate-600 group-hover:text-slate-800" />
               </button>
             )}
           </div>
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto bg-gradient-to-b from-slate-50/50 to-white/80">
           {!currentSession ? (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <Bot className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h2 className="text-2xl font-semibold text-gray-700 mb-2">Welcome to ML Agent</h2>
-                <p className="text-gray-500 mb-6">Your independent ML assistant for data analysis and insights</p>
+            <div className="h-full flex items-center justify-center p-8">
+              <div className="text-center max-w-2xl">
+                <div className="mb-8">
+                  <div className="w-20 h-20 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl animate-pulse">
+                    <Bot className="w-10 h-10 text-white" />
+                  </div>
+                  <h2 className="text-4xl font-bold text-slate-800 mb-4">
+                    Welcome to <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">ML Agent</span>
+                  </h2>
+                  <p className="text-xl text-slate-600 mb-8 leading-relaxed">
+                    Your independent AI assistant for advanced data analysis, insights, and machine learning solutions
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                  <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-slate-200/50 hover:shadow-xl transition-all duration-300 hover:scale-105">
+                    <div className="w-12 h-12 bg-gradient-to-r from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                      <Database className="w-6 h-6 text-white" />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800 mb-2">Data Analysis</h3>
+                    <p className="text-slate-600 text-sm">Upload your datasets and get instant insights, visualizations, and statistical analysis</p>
+                  </div>
+                  
+                  <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-slate-200/50 hover:shadow-xl transition-all duration-300 hover:scale-105">
+                    <div className="w-12 h-12 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                      <Zap className="w-6 h-6 text-white" />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800 mb-2">Smart Insights</h3>
+                    <p className="text-slate-600 text-sm">AI-powered recommendations and predictive analytics for your business decisions</p>
+                  </div>
+                </div>
+                
                 <button
                   onClick={() => setShowNewSessionModal(true)}
-                  className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                  className="inline-flex items-center space-x-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-2xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 active:scale-95"
                 >
-                  Start new conversation
+                  <Plus className="w-5 h-5" />
+                  <span>Start New Conversation</span>
+                  <ArrowRight className="w-5 h-5" />
                 </button>
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto px-4 py-6">
-              {messages.map((message) => (
-                <div key={message.id} className="mb-6">
-                  <div className="flex items-start space-x-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      message.role === 'user' ? 'bg-gray-900' : 'bg-green-600'
+            <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+              {messages.map((message, index) => (
+                <div 
+                  key={message.id} 
+                  className="opacity-0 animate-fade-in"
+                  style={{ animationDelay: `${index * 0.1}s`, animationFillMode: 'forwards' }}
+                >
+                  <div className={`flex items-start space-x-4 ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg ${
+                      message.role === 'user' 
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600' 
+                        : 'bg-gradient-to-r from-emerald-500 to-teal-600'
                     }`}>
                       {message.role === 'user' ? (
-                        <User className="w-4 h-4 text-white" />
+                        <User className="w-5 h-5 text-white" />
                       ) : (
-                        <Bot className="w-4 h-4 text-white" />
+                        <Bot className="w-5 h-5 text-white" />
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900 mb-1">
-                        {message.role === 'user' ? 'You' : 'ML Agent'}
+                    <div className={`flex-1 min-w-0 ${message.role === 'user' ? 'text-right' : ''}`}>
+                      <div className="flex items-center space-x-2 mb-3">
+                        <span className="text-sm font-bold text-slate-700">
+                          {message.role === 'user' ? 'You' : 'ML Agent'}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          {new Date(message.timestamp).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
                       </div>
-                      <div className="text-gray-700">
-                        {renderMessageContent(message.content, message.id)}
+                      <div className={`${
+                        message.role === 'user'
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-3xl rounded-br-lg shadow-lg px-6 py-4'
+                          : 'bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl rounded-bl-lg shadow-lg overflow-hidden'
+                      }`}>
+                        <div className={`${message.role === 'user' ? 'text-white' : 'text-slate-800'}`}>
+                          {renderMessageContent(message.content, message.id)}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -720,25 +972,27 @@ const ChatPage: React.FC = () => {
               
               {/* Streaming message */}
               {isLoading && streamingMessage && (
-                <div className="mb-6">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center relative">
-                      <Bot className="w-4 h-4 text-white" />
+                <div className="animate-fade-in">
+                  <div className="flex items-start space-x-4">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg relative">
+                      <Bot className="w-5 h-5 text-white" />
                       <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-ping"></div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <div className="text-sm font-medium text-gray-900">ML Agent</div>
-                        <div className="flex items-center space-x-1 text-xs text-green-600">
-                          <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse"></div>
-                          <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                          <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                          <span>streaming</span>
+                      <div className="flex items-center space-x-3 mb-3">
+                        <span className="text-sm font-bold text-slate-700">ML Agent</span>
+                        <div className="flex items-center space-x-2 px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
+                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                          <span>Streaming</span>
                         </div>
                       </div>
-                      <div className="text-gray-700">
-                        {renderMessageContent(streamingMessage, 'streaming')}
-                        <span className="inline-block w-2 h-5 bg-gray-400 animate-pulse ml-1">▋</span>
+                      <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl rounded-bl-lg shadow-lg overflow-hidden">
+                        <div className="text-slate-800 p-6">
+                          {renderMessageContent(streamingMessage, 'streaming')}
+                          <span className="inline-block w-2 h-5 bg-emerald-500 animate-pulse ml-1 rounded-sm">▋</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -747,18 +1001,24 @@ const ChatPage: React.FC = () => {
               
               {/* Loading indicator */}
               {isLoading && !streamingMessage && (
-                <div className="mb-6">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center">
-                      <Bot className="w-4 h-4 text-white animate-pulse" />
+                <div className="animate-fade-in">
+                  <div className="flex items-start space-x-4">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                      <Bot className="w-5 h-5 text-white animate-pulse" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900 mb-1">ML Agent</div>
-                      <div className="flex items-center space-x-2 text-gray-500">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                        <span>Analyzing your data...</span>
+                      <div className="flex items-center space-x-2 mb-3">
+                        <span className="text-sm font-bold text-slate-700">ML Agent</span>
+                      </div>
+                      <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-3xl rounded-bl-lg shadow-lg p-6">
+                        <div className="flex items-center space-x-3 text-slate-600">
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce"></div>
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          </div>
+                          <span className="font-medium">Analyzing your data and preparing insights...</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -772,36 +1032,65 @@ const ChatPage: React.FC = () => {
 
         {/* Input Area */}
         {currentSession && (
-          <div className="border-t border-gray-200 p-4">
-            <div className="max-w-3xl mx-auto">
+          <div className="border-t border-slate-200/60 bg-white/80 backdrop-blur-md p-6">
+            <div className="max-w-4xl mx-auto">
               <div className="relative">
-                <textarea
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      sendMessage();
-                    }
-                  }}
-                  placeholder={`Message ML Agent${activeFile ? ` about ${activeFile.file_name}` : ''}...`}
-                  className="w-full p-3 pr-12 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm md:text-base"
-                  rows={1}
-                  style={{ minHeight: '44px', maxHeight: '200px' }}
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = 'auto';
-                    target.style.height = Math.min(target.scrollHeight, 200) + 'px';
-                  }}
-                  disabled={isLoading}
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={!inputMessage.trim() || isLoading}
-                  className="absolute right-2 bottom-2 p-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+                <div className="flex items-end space-x-4 bg-white/90 backdrop-blur-sm rounded-3xl border border-slate-200/60 shadow-lg p-2 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500/50 transition-all duration-200">
+                  <div className="flex-1">
+                    <textarea
+                      value={inputMessage}
+                      onChange={(e) => setInputMessage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          sendMessage();
+                        }
+                      }}
+                      placeholder={`Ask ML Agent${activeFile ? ` about ${activeFile.file_name}` : ' anything about your data'}...`}
+                      className="w-full p-4 bg-transparent border-none resize-none focus:outline-none text-slate-800 placeholder-slate-500 text-base leading-6"
+                      rows={1}
+                      style={{ minHeight: '24px', maxHeight: '160px' }}
+                      onInput={(e) => {
+                        const target = e.target as HTMLTextAreaElement;
+                        target.style.height = 'auto';
+                        target.style.height = Math.min(target.scrollHeight, 160) + 'px';
+                      }}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <button
+                    onClick={sendMessage}
+                    disabled={!inputMessage.trim() || isLoading}
+                    className={`p-3 rounded-2xl transition-all duration-200 shadow-lg ${
+                      inputMessage.trim() && !isLoading
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-blue-500/25 hover:shadow-blue-500/40 transform hover:scale-105 active:scale-95'
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {isLoading ? (
+                      <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Send className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+                
+                {/* Helper text */}
+                <div className="flex items-center justify-center space-x-4 mt-3 text-xs text-slate-500">
+                  <div className="flex items-center space-x-1">
+                    <Bot className="w-3 h-3" />
+                    <span>AI-powered data analysis</span>
+                  </div>
+                  {activeFile?.file_name && (
+                    <>
+                      <span>•</span>
+                      <div className="flex items-center space-x-1">
+                        <File className="w-3 h-3 text-emerald-600" />
+                        <span className="text-emerald-600 font-medium">{activeFile.file_name}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -810,79 +1099,145 @@ const ChatPage: React.FC = () => {
 
       {/* Right Sidebar - Files */}
       <div className={`${
-        rightSidebarOpen ? 'w-80 md:w-80' : 'w-0'
-      } transition-all duration-300 ease-in-out overflow-hidden bg-gray-50 border-l border-gray-200 flex flex-col ${
-        rightSidebarOpen ? 'fixed md:relative z-40 md:z-auto right-0 h-full' : ''
+        rightSidebarOpen ? 'w-96 md:w-96' : 'w-0'
+      } transition-all duration-500 ease-in-out overflow-hidden bg-gradient-to-b from-slate-50 to-white border-l border-slate-200/60 flex flex-col ${
+        rightSidebarOpen ? 'fixed md:relative z-40 md:z-auto right-0 h-full shadow-2xl' : ''
       }`}>
         {/* Files Header */}
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Dataset Files</h2>
+        <div className="p-6 border-b border-slate-200/60 bg-white/80 backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Database className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">Dataset Files</h2>
+                <p className="text-xs text-slate-500">
+                  {files.length} file{files.length !== 1 ? 's' : ''} available
+                </p>
+              </div>
+            </div>
             <button
               onClick={() => setRightSidebarOpen(false)}
-              className="p-1 hover:bg-gray-200 rounded"
+              className="p-2 hover:bg-slate-100 rounded-2xl transition-all duration-200 group"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5 text-slate-600 group-hover:text-slate-800" />
             </button>
           </div>
           <button
             onClick={() => setShowUploadModal(true)}
-            className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+            className="w-full flex items-center justify-center space-x-3 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
           >
             <Upload className="w-4 h-4" />
-            <span>Upload dataset</span>
+            <span>Upload Dataset</span>
+            <div className="w-1 h-1 bg-white/30 rounded-full"></div>
           </button>
         </div>
 
         {/* Files List */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {loadingFiles ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></div>
+            <div className="flex items-center justify-center py-12">
+              <div className="flex flex-col items-center space-y-4">
+                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-slate-600 font-medium">Loading datasets...</p>
+              </div>
             </div>
           ) : files.length === 0 ? (
-            <div className="text-center py-8">
-              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">No datasets uploaded yet</p>
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <FileText className="w-8 h-8 text-slate-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">No datasets yet</h3>
+              <p className="text-slate-500 text-sm leading-relaxed">
+                Upload your first dataset to start analyzing data with ML Agent
+              </p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {files.map((file) => (
-                <div
-                  key={file.file_name}
-                  onClick={() => currentSession && setActiveFileForSession(file.file_name || '')}
-                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                    activeFile?.file_name === file.file_name
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-white border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <File className={`w-5 h-5 ${
-                      activeFile?.file_name === file.file_name ? 'text-green-600' : 'text-gray-400'
-                    }`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-900 truncate">
-                        {file.file_name}
+            <>
+              <div className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-4 px-2">
+                Available Datasets
+              </div>
+              <div className="space-y-3">
+                {files.map((file, index) => (
+                  <div
+                    key={file.file_name}
+                    className="opacity-0 animate-fade-in"
+                    style={{ animationDelay: `${index * 0.05}s`, animationFillMode: 'forwards' }}
+                  >
+                    <div className={`group relative p-4 rounded-2xl border transition-all duration-300 overflow-hidden ${
+                        activeFile?.file_name === file.file_name
+                          ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-200 shadow-lg transform scale-[1.02]'
+                          : 'bg-white/80 backdrop-blur-sm border-slate-200/60 hover:border-slate-300 hover:shadow-lg hover:bg-white hover:transform hover:scale-[1.01]'
+                      }`}
+                    >
+                      <div className="flex items-start space-x-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-md transition-all duration-300 ${
+                          activeFile?.file_name === file.file_name 
+                            ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white' 
+                            : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
+                        }`}>
+                          <File className="w-6 h-6" />
+                        </div>
+                        <div 
+                          className="flex-1 min-w-0 cursor-pointer"
+                          onClick={() => currentSession && setActiveFileForSession(file.file_name || '')}
+                        >
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="font-bold text-slate-800 truncate">
+                              {file.file_name}
+                            </span>
+                            {activeFile?.file_name === file.file_name && (
+                              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                            )}
+                          </div>
+                          {file.description && (
+                            <p className="text-sm text-slate-600 truncate mb-2 leading-5">
+                              {file.description}
+                            </p>
+                          )}
+                          <div className="flex items-center space-x-3 text-xs">
+                            {file.size && (
+                              <span className="text-slate-500 font-medium">
+                                {(file.size / 1024 / 1024).toFixed(1)} MB
+                              </span>
+                            )}
+                            {file.upload_time && (
+                              <span className="text-slate-400">
+                                {new Date(file.upload_time).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {settingActiveFile === file.file_name && (
+                            <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteFile(file);
+                            }}
+                            className="p-2 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-500 transition-all duration-200"
+                            title="Delete file"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                      {file.description && (
-                        <div className="text-sm text-gray-500 truncate">
-                          {file.description}
-                        </div>
-                      )}
-                      {file.size && (
-                        <div className="text-xs text-gray-400">
-                          {(file.size / 1024 / 1024).toFixed(2)} MB
-                        </div>
+                      
+                      {/* Active indicator */}
+                      {activeFile?.file_name === file.file_name && (
+                        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-12 bg-emerald-500 rounded-r-full shadow-lg"></div>
                       )}
                     </div>
-                    {settingActiveFile === file.file_name && (
-                      <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
-                    )}
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -1034,6 +1389,163 @@ const ChatPage: React.FC = () => {
           </div>
         </div>
       )}
+      
+      {/* Delete Session Confirmation Modal */}
+      {showDeleteSessionModal && sessionToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 animate-modal-in">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Delete Session</h2>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete the session <strong>&ldquo;{sessionToDelete.title}&rdquo;</strong>? 
+              This action cannot be undone and all messages in this session will be permanently lost.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteSessionModal(false);
+                  setSessionToDelete(null);
+                }}
+                disabled={deletingSession}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteSession}
+                disabled={deletingSession}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+              >
+                {deletingSession ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete Session'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Delete File Confirmation Modal */}
+      {showDeleteFileModal && fileToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 animate-modal-in">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Delete File</h2>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete the file <strong>&ldquo;{fileToDelete.file_name}&rdquo;</strong>? 
+              This action cannot be undone and the file will be permanently removed from your account.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteFileModal(false);
+                  setFileToDelete(null);
+                }}
+                disabled={deletingFile}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteFile}
+                disabled={deletingFile}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+              >
+                {deletingFile ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete File'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Enhanced CSS Animations */}
+      <style jsx>{`
+        @keyframes fade-in {
+          from { 
+            opacity: 0; 
+            transform: translateY(10px); 
+          }
+          to { 
+            opacity: 1; 
+            transform: translateY(0); 
+          }
+        }
+        
+        @keyframes slide-in {
+          from { 
+            opacity: 0; 
+            transform: translateX(-10px); 
+          }
+          to { 
+            opacity: 1; 
+            transform: translateX(0); 
+          }
+        }
+        
+        @keyframes modal-in {
+          from { 
+            opacity: 0; 
+            transform: scale(0.95) translateY(10px); 
+          }
+          to { 
+            opacity: 1; 
+            transform: scale(1) translateY(0); 
+          }
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out forwards;
+        }
+        
+        .animate-slide-in {
+          animation: slide-in 0.5s ease-out forwards;
+        }
+        
+        .animate-modal-in {
+          animation: modal-in 0.3s ease-out forwards;
+        }
+        
+        /* Custom scrollbar */
+        .overflow-y-auto::-webkit-scrollbar {
+          width: 6px;
+        }
+        
+        .overflow-y-auto::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        
+        .overflow-y-auto::-webkit-scrollbar-thumb {
+          background: rgba(148, 163, 184, 0.4);
+          border-radius: 3px;
+        }
+        
+        .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+          background: rgba(148, 163, 184, 0.6);
+        }
+        
+        /* Backdrop blur for better glass effect */
+        .backdrop-blur-sm {
+          backdrop-filter: blur(8px);
+        }
+        
+        .backdrop-blur-md {
+          backdrop-filter: blur(12px);
+        }
+        
+        .backdrop-blur-xl {
+          backdrop-filter: blur(20px);
+        }
+      `}</style>
     </div>
   );
 };
