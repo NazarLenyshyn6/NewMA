@@ -25,6 +25,11 @@ from agent.registry.runners.code.generator import (
     code_generation_runner,
 )
 
+from agent.registry.runners.code.stitcher import (
+    CodeStitchingRunner,
+    code_stitching_runner,
+)
+
 from agent.registry.memory.planners import solution_planner_memory_manager
 
 
@@ -36,6 +41,7 @@ class AgentService(BaseModel):
     subtask_classification_runner: SubTasksClassificationRunner
     solution_planning_runner: SolutionPlanningRunner
     code_generation_runner: CodeGenerationRunner
+    code_stitching_runner: CodeStitchingRunner
 
     def chat(
         self,
@@ -76,7 +82,7 @@ class AgentService(BaseModel):
 
         print("Solution plan:", solution_plans)
 
-        code = self.code_generation_runner.generate_code(
+        code_snippets = self.code_generation_runner.generate_code(
             db=db,
             user_id=user_id,
             session_id=session_id,
@@ -89,6 +95,12 @@ class AgentService(BaseModel):
             ),
         )
 
+        print("Code snippets:", code_snippets)
+        if len(code_snippets) == 1:
+            return code_snippets[0]
+
+        code = code_stitching_runner.stitch(question, code_snippets)
+
         return code
 
 
@@ -97,4 +109,5 @@ agent_service = AgentService(
     subtask_classification_runner=subtasks_classification_runner,
     solution_planning_runner=solution_planning_runner,
     code_generation_runner=code_generation_runner,
+    code_stitching_runner=code_stitching_runner,
 )
