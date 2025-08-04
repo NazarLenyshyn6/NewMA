@@ -29,4 +29,5 @@ anthropic_code_stitching_model = ChatAnthropic(
     max_tokens=4000,
     top_k=None,
     top_p=1,
+    streaming=True,
 )

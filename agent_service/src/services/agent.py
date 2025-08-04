@@ -103,6 +103,74 @@ class AgentService(BaseModel):
 
         return code
 
+    async def chat_stream(
+        self,
+        question: str,
+        db: Session,
+        user_id: int,
+        session_id: UUID,
+        file_name: str,
+        storage_uri: str,
+        dataset_summary: str,
+    ):
+        yield "🔍 Classifying tasks for you question:"
+        tasks = self.task_classification_runner.classify(question)
+        yield f"✅ {tasks}\n\n"
+
+        yield "🔍 Classifying subtasks: "
+        subtasks = self.subtask_classification_runner.classify(question, tasks)
+        yield f"{subtasks}\n\n"
+
+        yield "🧠 Generating solution plan...\n"
+        solution_plans, dependencies = (
+            self.solution_planning_runner.generate_solution_plan(
+                question=question,
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+                subtasks=subtasks,
+            )
+        )
+        yield f"✅ Solution plans: {'\n'.join(solution_plans)}\n\n"
+
+        solution_planner_memory_manager.update_solutions_history(
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+            new_solutions="\n\n".join(solution_plans),
+        )
+
+        yield "🛠️ Generating code snippets...\n"
+        code_snippets = self.code_generation_runner.generate_code(
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+            dataset_summary=dataset_summary,
+            instructions=solution_plans,
+            dependencies=" ".join(
+                [dependency.get_avaliable_modules() for dependency in dependencies]
+            ),
+        )
+
+        # yield f"✅ Code snippets generated: {len(code_snippets)}\n\n"
+
+        # if len(code_snippets) == 1:
+        #     yield "✅ Final Code:<br>"
+        #     yield code_snippets[0]
+        #     return
+
+        yield "🧵 Stitching code snippets...<br>"
+        async for chunk in self.code_stitching_runner.stitch_stream(
+            question, code_snippets
+        ):
+            yield chunk
+
 
 agent_service = AgentService(
     task_classification_runner=tasks_classification_runner,

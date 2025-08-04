@@ -1,6 +1,6 @@
 """..."""
 
-from typing import Any, List
+from typing import Any, List, AsyncGenerator
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 from langchain_core.runnables import Runnable
@@ -40,3 +40,15 @@ class CodeStitchingRunner(BaseModel):
             }
         ).content
         return code
+
+    async def stitch_stream(
+        self, question: str, code_snippets: List[str]
+    ) -> AsyncGenerator:
+        """..."""
+        async for chunk in self._code_stitching_chain.astream(
+            {
+                "question": question,
+                "code_snippets": self._format_code_snippers(code_snippets),
+            }
+        ):
+            yield chunk.content
