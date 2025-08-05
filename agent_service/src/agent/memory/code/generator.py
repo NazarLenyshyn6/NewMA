@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from services.chat_history import ChatHistoryService
+from agent.summarizers.code.generator import GeneratedCodeSummarizer
 
 
 class CodeGeneratorMemoryManager(BaseModel):
@@ -15,6 +16,7 @@ class CodeGeneratorMemoryManager(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     chat_history_service: ChatHistoryService
+    summarizer: GeneratedCodeSummarizer
 
     def get_code_history(
         self,
@@ -44,4 +46,22 @@ class CodeGeneratorMemoryManager(BaseModel):
         file_name: str,
         storage_uri: str,
         new_code: str,
-    ) -> None: ...
+    ) -> None:
+        code_history = self.get_code_history(
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+        )
+        new_code_history = self.summarizer.summarize(
+            summary=code_history, generated_code=new_code
+        )
+        self.chat_history_service.update_chat_history_cache(
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+            code_update=pickle.dumps(new_code_history),
+        )

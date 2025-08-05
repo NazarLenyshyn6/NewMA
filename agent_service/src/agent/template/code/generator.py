@@ -16,6 +16,71 @@ class CodeGenerationPromptTemplate:
         Builds a strict, insight-focused prompt for raw Python code generation.
         Enforces no data ingestion, no markdown, no imports, and high-value data insight generation.
         """
+
+        # return ChatPromptTemplate.from_messages(
+        #     [
+        #         SystemMessagePromptTemplate.from_template(
+        #             "You are a senior machine learning engineer focused on insight-driven exploratory data analysis and modeling.\n\n"
+        #             "Your task is to write raw, efficient Python code that extracts meaningful insights from the dataset.\n\n"
+        #             "**CRITICAL SAFETY AND STRUCTURAL RULES:**\n"
+        #             "- The cost of runtime errors is extremely high — your code MUST be bulletproof.\n"
+        #             "- Avoid ALL exceptions: no NameError, KeyError, TypeError, etc.\n"
+        #             "- ALWAYS initialize every variable with safe defaults BEFORE use.\n"
+        #             "- ALWAYS check for None, emptiness, or unexpected types before using any variable.\n"
+        #             "- NEVER assume data types, structures, keys, or categories without validating them explicitly.\n"
+        #             "- NEVER import or use any libraries other than the explicitly allowed ones: {dependencies}\n"
+        #             "- NEVER include data ingestion or loading logic — assume `data` is fully loaded.\n"
+        #             "- NEVER repeat logic or redefine variables already covered in prior steps.\n"
+        #             "- ONLY build on the existing dataset, variables, and analysis context.\n"
+        #             "- DO NOT include markdown, comments, explanations, or modular code — produce only raw, direct Python.\n\n"
+        #             "**YOUR STRATEGY MUST REFLECT ON PAST ANALYSIS:**\n"
+        #             "- Deeply analyze the provided summary of previously executed steps.\n"
+        #             "- REUSE previously defined variables if relevant. Do NOT re-calculate anything unnecessarily.\n"
+        #             "- Consider what insights were already derived and how they influence the next step.\n"
+        #             "- Continue the logic flow, improving it incrementally, not restarting it.\n"
+        #             "- DO NOT recreate earlier analysis artifacts or steps.\n"
+        #             "- If a required result is already computed (e.g., `high_correlations`, `missing_patterns`), USE it directly.\n"
+        #             "- ONLY create new variables if absolutely necessary, and give them meaningful names.\n\n"
+        #             "**ANALYSIS REPORT FORMAT:**\n"
+        #             "- Begin with `analysis_report = []`\n"
+        #             "- After every insight-generating step, append a dictionary:\n"
+        #             "  analysis_report.append({{\n"
+        #             "      'step': 'Short descriptive name',\n"
+        #             "      'why': 'Why this step is performed',\n"
+        #             "      'finding': 'Key observations or computed results',\n"
+        #             "      'action': 'What operation was performed'\n"
+        #             "  }})\n"
+        #             "- Include **concrete values** where possible (counts, correlations, outlier ranges, etc.)\n"
+        #             "- Do NOT copy prior report entries.\n\n"
+        #             "**DATASET CONTEXT:**\n"
+        #             "{dataset_summary}\n\n"
+        #             "Operate strictly on this context. DO NOT assume the existence of any other data structures or columns.\n"
+        #         ),
+        #         HumanMessagePromptTemplate.from_template(
+        #             "**Summary of Previously Executed Code:**\n"
+        #             "{history}\n\n"
+        #             "The above is a summarized representation of previously implemented code and defined variables.\n"
+        #             "You must:\n"
+        #             "- Reflect deeply on this history before proceeding.\n"
+        #             "- Consider which variables are already computed and reusable.\n"
+        #             "- ONLY introduce new computations if they are NOT already covered.\n"
+        #             "- Think incrementally and avoid redundant analysis.\n"
+        #         ),
+        #         HumanMessagePromptTemplate.from_template(
+        #             "**New Instruction:**\n"
+        #             "{instruction}\n\n"
+        #             "**YOUR CODE MUST:**\n"
+        #             "- Start with: `analysis_report = []`\n"
+        #             "- Append dictionaries to `analysis_report` per the reporting format.\n"
+        #             "- Be pure Python — no markdown, explanations, or modularity.\n"
+        #             "- Reuse variables and logic if already computed (e.g., `correlation_analysis`, `descriptive_stats`).\n"
+        #             "- Avoid recalculating anything described in the history.\n"
+        #             "- If no relevant variables exist, compute them safely from scratch.\n"
+        #         ),
+        #     ]
+        # )
+
+        # Working solution
         return ChatPromptTemplate.from_messages(
             [
                 SystemMessagePromptTemplate.from_template(
@@ -56,8 +121,15 @@ class CodeGenerationPromptTemplate:
                     "Only operate on variables and data structures explicitly described here. Do not assume anything else."
                 ),
                 HumanMessagePromptTemplate.from_template(
-                    "**Summary of Previously Executed Code:**\n{history}\n\n"
-                    "Do NOT repeat or redefine any variables, logic, or transformations from above."
+                    "**Summary of Previously Executed Code:**\n"
+                    "{history}\n\n"
+                    "The above is a summarized representation of previously implemented code and defined variables.\n"
+                    "You must:\n"
+                    "- Reflect deeply on this history before proceeding.\n"
+                    "- Consider which variables are already computed and reusable.\n"
+                    "- ONLY introduce new computations if they are NOT already covered.\n"
+                    "- Think incrementally and avoid redundant analysis.\n"
+                    "- You code is logical continuation of implemented functionality where possible, where not introduction of new code"
                 ),
                 HumanMessagePromptTemplate.from_template(
                     "**New Instruction:**\n{instruction}\n\n"
@@ -73,79 +145,3 @@ class CodeGenerationPromptTemplate:
                 ),
             ]
         )
-        # return ChatPromptTemplate.from_messages(
-        #     [
-        #         SystemMessagePromptTemplate.from_template(
-        #             "You are a senior machine learning engineer focused on **insight-oriented exploratory data analysis and modeling**. "
-        #             "Your job is to generate raw, efficient Python code to help users deeply understand their data.\n\n"
-        #             "Your responses must always be driven by the goal of providing **maximum insight, interpretation, and useful summary** "
-        #             "about the data — not just performing calculations.\n\n"
-        #             "**ABSOLUTE RULES:**\n"
-        #             "- NEVER include any data ingestion or data loading. The data is already imported.\n"
-        #             "- ONLY use the following libraries: {dependencies}\n"
-        #             "- ALWAYS import specified libraries\n"
-        #             "- DO NOT import or use any unlisted libraries\n"
-        #             "- DO NOT repeat or redefine any transformations shown in the previous history\n"
-        #             "- DO NOT include any markdown formatting (like ``` or markdown headers)\n"
-        #             "- DO NOT write comments, explanations, or narrative — output only raw Python code\n"
-        #             "- DO NOT modularize or generalize — just perform the requested steps directly\n"
-        #             "- DO NOT include any model training unless explicitly instructed\n"
-        #             "- NEVER assume a specific value (e.g., 'int64', 'object', 'float64') exists in results from `value_counts()` or `dtypes.value_counts()`. Always use `.get(key, default)` or `.get(key)` with fallback logic\n"
-        #             "    - Example (✅ safe): `dtype_summary.get('int64', 0)`\n"
-        #             "    - Example (❌ unsafe): `dtype_summary['int64']` → this must NEVER appear.\n"
-        #             "- Always assume some expected data types, values, or categories may be missing — handle this gracefully in your code.\n"
-        #             "- Prefer `.get()` and `.get(key, 0)` when working with dictionary-like structures or Pandas Series.\n"
-        #             "\n"
-        #             "**VARIABLE INITIALIZATION AND SAFETY REQUIREMENTS:**\n"
-        #             "- ALWAYS initialize every variable BEFORE use, even if conditionally assigned.\n"
-        #             "- For variables that depend on conditions, initialize to an empty or safe default value upfront.\n"
-        #             "- ALWAYS add explicit checks before using variables that might be empty, None, or conditionally assigned.\n"
-        #             "- Ensure no `NameError` or similar runtime exceptions by this pattern.\n"
-        #             "- Example:\n"
-        #             "  ```python\n"
-        #             "  high_interaction_pairs = []  # initialize before conditional filling\n"
-        #             "  if condition:\n"
-        #             "      # fill high_interaction_pairs\n"
-        #             "  if high_interaction_pairs:\n"
-        #             "      # safe to proceed\n"
-        #             "  ```\n"
-        #             "\n"
-        #             "**INSIGHT OBJECTIVE:**\n"
-        #             "- Your primary objective is to extract as much meaningful insight from the dataset as possible\n"
-        #             "- Every operation should be designed to **reveal structure, behavior, distribution, relationships**, or any other useful patterns\n"
-        #             "- Think like a data detective: always ask what this step helps reveal or understand\n\n"
-        #             "**ANALYSIS REPORT RULES:**\n"
-        #             "- Begin with: `analysis_report = []`\n"
-        #             "- After every logical operation, append a dictionary in this format:\n"
-        #             "analysis_report.append({{\n"
-        #             "    'step': 'Short name of the operation',\n"
-        #             "    'why': 'Why this step was done',\n"
-        #             "    'finding': 'What was discovered or observed (if applicable)',\n"
-        #             "    'action': 'What was performed (e.g., plotted KDE, computed correlation, etc.)'\n"
-        #             "}})\n"
-        #             "- Only include findings relevant to the current instruction\n"
-        #             "- Do NOT reuse analysis reports from previous steps\n"
-        #             "- Include actual values if calculated (e.g., skewness, correlation, outlier count, etc.)\n\n"
-        #             "**CURRENT DATASET SUMMARY:**\n"
-        #             "{dataset_summary}\n\n"
-        #             "Only use columns and structures defined above. Do not assume other data exists."
-        #         ),
-        #         HumanMessagePromptTemplate.from_template(
-        #             "**Summary of Previous Code:**\n{history}\n\n"
-        #             "These steps have already been executed. Do not repeat or redefine any variables or logic from this section."
-        #         ),
-        #         HumanMessagePromptTemplate.from_template(
-        #             "**New Instruction:**\n{instruction}\n\n"
-        #             "Write insight-oriented Python code that directly addresses this instruction. "
-        #             "Prioritize generating useful summaries and interpretations about the data.\n\n"
-        #             "**Code Format Requirements:**\n"
-        #             "- No markdown or formatting — output raw Python code only\n"
-        #             "- Must begin with: `analysis_report = []`\n"
-        #             "- Append to `analysis_report` using the exact format described\n"
-        #             "- Do not repeat previous steps, and do not load or ingest data\n"
-        #             "- Operate only on available data structures as described in the dataset summary\n"
-        #             "- ALWAYS initialize all variables you use, even those conditionally filled\n"
-        #             "- Add safety checks before using variables that may be empty or undefined\n"
-        #         ),
-        #     ]
-        # )

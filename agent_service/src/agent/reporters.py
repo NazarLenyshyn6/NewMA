@@ -23,13 +23,17 @@ template = ChatPromptTemplate.from_messages(
             "Do not output raw technical data or code; focus on interpretation and implications.\n"
             "Highlight techical insights and findings"
             "Format the output as a professional report or executive summary.\n"
-            "**STRICT OUTPUT FORMAT REQUIREMENTS:**\n"
-            "- Do NOT include any markdown syntax, code blocks, or special formatting.\n"
-            "- The output must be directly usable as a Python multiline string literal content without further cleaning.\n"
-            "- Avoid any characters or formatting that would break Python string syntax or require additional processing.\n"
+            "**STRICT OUTPUT FORMAT RULES:**\n"
+            "1. Do NOT use markdown formatting (no **, __, *, #, `, etc.).\n"
+            "2. Do NOT include code blocks or backticks.\n"
+            "3. Do NOT use quotation marks, escape sequences, or symbols that would break a Python multiline string.\n"
+            "4. Do NOT include any formatting that would require further post-processing.\n"
+            "5. The entire output must be valid as a raw Python multiline string literal.\n"
+            "6. Only use plain, well-structured text suitable for direct use in string literals.\n\n"
+            "The output must resemble a professional executive summary or analytical report written in plain English."
         ),
         HumanMessagePromptTemplate.from_template(
-            "**Detailed Outlier Analysis Report:**\n\n{report}\n\n"
+            "**Detailed Analysis Report:**\n\n{report}\n\n"
             "Generate a clear, detailed, and user-friendly summary explaining what was done, the key findings and their impact, "
             "and recommended next steps or actions based on this report."
         ),

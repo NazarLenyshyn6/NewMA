@@ -1,6 +1,7 @@
 """..."""
 
 from uuid import UUID
+from types import ModuleType
 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -41,7 +42,9 @@ class CodeExecutionRunner(BaseModel):
         try:
             exec(code, global_context)
             local_context = {
-                k: v for k, v in global_context.items() if k not in dependencies
+                k: v
+                for k, v in global_context.items()
+                if k not in dependencies and not isinstance(v, ModuleType)
             }
             return local_context
 

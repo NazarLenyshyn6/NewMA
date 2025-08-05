@@ -36,7 +36,7 @@ class CodeVariablesMemoryManager(BaseModel):
         code_history: dict = pickle.loads(code_variables_history_bytes)
         return code_history
 
-    def update_code_history(
+    def update_variables_history(
         self,
         db: Session,
         user_id: int,

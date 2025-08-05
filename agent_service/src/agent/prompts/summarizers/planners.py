@@ -6,3 +6,10 @@ from agent.examples.summarizers.planners import solution_plans_summarization_exa
 solution_plans_summarization_prompt = SolutionPlansSummarizationPromptTemplate.build(
     examples=solution_plans_summarization_examples
 )
+
+
+print(
+    solution_plans_summarization_prompt.invoke(
+        {"summary": "hello", "new_solutions": "hello"}
+    )
+)

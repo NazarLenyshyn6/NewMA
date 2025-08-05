@@ -38,6 +38,8 @@ from agent.registry.runners.code.execution import (
 
 from agent.reporters import generate_report
 from agent.registry.memory.planners import solution_planner_memory_manager
+from agent.registry.memory.code.variables import code_variables_memory_manager
+from agent.registry.memory.code.generator import code_generator_memory_manager
 
 
 class AgentService(BaseModel):
@@ -152,16 +154,6 @@ class AgentService(BaseModel):
             yield f"   {i}. {plan}\n"
         yield "\n"
 
-        # Save solution plan
-        solution_planner_memory_manager.update_solutions_history(
-            db=db,
-            user_id=user_id,
-            session_id=session_id,
-            file_name=file_name,
-            storage_uri=storage_uri,
-            new_solutions="\n\n".join(solution_plans),
-        )
-
         # Step 4: Code Generation
         yield "🧠 Step 4: Code Generation\n"
         yield "🛠️ Generating code snippets from the plan...\n"
@@ -219,10 +211,40 @@ class AgentService(BaseModel):
                     f"  Finding: {step.get('finding', '')}\n"
                     f"  Action: {step.get('action', '')}\n"
                 )
+
             report = "\n".join(formatted_analysis_report)
 
             async for chunk in generate_report(report):
                 yield chunk
+
+            yield "\n💾 Updating Agent memory to reflect all plans, analysis insights, and generated code. This ensures consistency for future steps.\n"
+            # Save solution plan
+            solution_planner_memory_manager.update_solutions_history(
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+                new_solutions=report,
+            )
+
+            code_variables_memory_manager.update_variables_history(
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+                new_code_variables=code_execution_result,
+            )
+
+            code_generator_memory_manager.update_code_history(
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+                new_code=code,
+            )
 
 
 agent_service = AgentService(
