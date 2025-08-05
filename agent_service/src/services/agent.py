@@ -1,6 +1,7 @@
 """..."""
 
 from uuid import UUID
+import re
 
 from pydantic import BaseModel, ConfigDict
 
@@ -30,6 +31,11 @@ from agent.registry.runners.code.stitcher import (
     code_stitching_runner,
 )
 
+from agent.registry.runners.code.execution import (
+    CodeExecutionRunner,
+    code_execution_runner,
+)
+
 from agent.registry.memory.planners import solution_planner_memory_manager
 
 
@@ -42,6 +48,7 @@ class AgentService(BaseModel):
     solution_planning_runner: SolutionPlanningRunner
     code_generation_runner: CodeGenerationRunner
     code_stitching_runner: CodeStitchingRunner
+    code_execution_runner: CodeExecutionRunner
 
     def chat(
         self,
@@ -113,15 +120,21 @@ class AgentService(BaseModel):
         storage_uri: str,
         dataset_summary: str,
     ):
-        yield "🔍 Classifying tasks for you question:"
+        # Step 1: Task Classification
+        yield "🧠 Step 1: Task Classification\n"
+        yield "🔍 Understanding your question...\n"
         tasks = self.task_classification_runner.classify(question)
-        yield f"✅ {tasks}\n\n"
+        yield f"✅ Identified task(s): `{tasks}`\n\n"
 
-        yield "🔍 Classifying subtasks: "
+        # Step 2: Subtask Classification
+        yield "🧠 Step 2: Subtask Classification\n"
+        yield "🔍 Breaking down tasks into smaller subtasks...\n"
         subtasks = self.subtask_classification_runner.classify(question, tasks)
-        yield f"{subtasks}\n\n"
+        yield f"✅ Subtasks: `{subtasks}`\n\n"
 
-        yield "🧠 Generating solution plan...\n"
+        # Step 3: Solution Planning
+        yield "🧠 Step 3: Solution Planning\n"
+        yield "🔧 Building a solution strategy...\n"
         solution_plans, dependencies = (
             self.solution_planning_runner.generate_solution_plan(
                 question=question,
@@ -133,8 +146,12 @@ class AgentService(BaseModel):
                 subtasks=subtasks,
             )
         )
-        yield f"✅ Solution plans: {'\n'.join(solution_plans)}\n\n"
+        yield "✅ Solution plan created successfully:\n"
+        for i, plan in enumerate(solution_plans, 1):
+            yield f"   {i}. {plan}\n"
+        yield "\n"
 
+        # Save solution plan
         solution_planner_memory_manager.update_solutions_history(
             db=db,
             user_id=user_id,
@@ -144,7 +161,9 @@ class AgentService(BaseModel):
             new_solutions="\n\n".join(solution_plans),
         )
 
-        yield "🛠️ Generating code snippets...\n"
+        # Step 4: Code Generation
+        yield "🧠 Step 4: Code Generation\n"
+        yield "🛠️ Generating code snippets from the plan...\n"
         code_snippets = self.code_generation_runner.generate_code(
             db=db,
             user_id=user_id,
@@ -157,25 +176,57 @@ class AgentService(BaseModel):
                 [dependency.get_avaliable_modules() for dependency in dependencies]
             ),
         )
+        yield f"✅ Generated `{len(code_snippets)}` code snippet(s)\n\n"
 
-        # yield f"✅ Code snippets generated: {len(code_snippets)}\n\n"
-
-        # if len(code_snippets) == 1:
-        #     yield "✅ Final Code:<br>"
-        #     yield code_snippets[0]
-        #     return
-
-        yield "🧵 Stitching code snippets...<br>"
+        # Step 5: Code Stitching
+        yield "🧠 Step 5: Code Stitching\n"
+        yield "🧵 Merging code snippets into a complete solution...\n"
+        code_chunks = []
         async for chunk in self.code_stitching_runner.stitch_stream(
             question, code_snippets
         ):
+            code_chunks.append(chunk)
             yield chunk
+
+        code = "".join(code_chunks)
+        yield "\n✅ Code stitching complete.\n\n"
+
+        # Step 6: Code Execution
+        yield "🧠 Step 6: Code Execution\n"
+        yield "🚀 Running the final code...\n"
+        code = re.sub(r"```(?:python)?\n?", "", code).strip()
+        code_execution_result = self.code_execution_runner.execute(
+            db=db,
+            session_id=session_id,
+            user_id=user_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+            code=code,
+            dependencies=dependencies[0].get_imputed_modules(),
+        )
+        if isinstance(code_execution_result, str):
+            yield code_execution_result
+        else:
+            # Extract analysis_report
+            analysis_report = code_execution_result.get("analysis_report", [])
+
+            # Stream each analysis step nicely
+            yield "\n🧾 Analysis Report:\n"
+            for idx, step in enumerate(analysis_report, 1):
+                # Each step is a dict with keys like 'step', 'why', 'finding', 'action'
+                yield (
+                    f"Step {idx}: {step.get('step', '')}\n"
+                    f"  Why: {step.get('why', '')}\n"
+                    f"  Finding: {step.get('finding', '')}\n"
+                    f"  Action: {step.get('action', '')}\n\n"
+                )
 
 
 agent_service = AgentService(
     task_classification_runner=tasks_classification_runner,
     subtask_classification_runner=subtasks_classification_runner,
     solution_planning_runner=solution_planning_runner,
-    code_generation_runner=code_generation_runner,
     code_stitching_runner=code_stitching_runner,
+    code_generation_runner=code_generation_runner,
+    code_execution_runner=code_execution_runner,
 )

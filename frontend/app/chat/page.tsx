@@ -689,14 +689,25 @@ const ChatPage: React.FC = () => {
     setStreamingMessage('');
 
     try {
+      console.log('🚀 Starting streaming request for question:', currentQuestion.substring(0, 50) + '...');
       if (DEBUG_STREAMING) {
         console.log('Starting streaming request to:', `http://localhost:8003/api/v1/gateway/chat/stream?question=${encodeURIComponent(currentQuestion)}`);
       }
       
-      const response = await fetch(`http://localhost:8003/api/v1/gateway/chat/stream?question=${encodeURIComponent(currentQuestion)}`, {
+      // Try streaming endpoint - first without trailing slash
+      let response = await fetch(`http://localhost:8003/api/v1/gateway/chat/stream?question=${encodeURIComponent(currentQuestion)}`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
+
+      // If that fails, try with trailing slash
+      if (!response.ok && (response.status === 404 || response.status === 405)) {
+        console.log(`Streaming endpoint failed with ${response.status}, trying with trailing slash...`);
+        response = await fetch(`http://localhost:8003/api/v1/gateway/chat/stream/?question=${encodeURIComponent(currentQuestion)}`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+        });
+      }
 
       if (DEBUG_STREAMING) {
         console.log('Stream response status:', response.status, 'OK:', response.ok);
@@ -709,19 +720,26 @@ const ChatPage: React.FC = () => {
       }
 
       if (response.ok && response.body) {
+        console.log('✅ Streaming response received, starting to read chunks...');
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullContent = '';
+        let chunkCount = 0;
 
         try {
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
+            if (done) {
+              console.log(`✅ Streaming completed. Total chunks: ${chunkCount}, Final content length: ${fullContent.length}`);
+              break;
+            }
 
             // Decode the chunk - this is plain text from the ML agent
             const chunk = decoder.decode(value, { stream: true });
+            chunkCount++;
+            
             if (DEBUG_STREAMING) {
-              console.log('Received chunk:', JSON.stringify(chunk));
+              console.log(`📦 Chunk ${chunkCount}:`, JSON.stringify(chunk));
             }
             
             // Simply append the chunk to the full content
@@ -729,7 +747,7 @@ const ChatPage: React.FC = () => {
             setStreamingMessage(fullContent);
           }
         } catch (readError) {
-          console.error('Error reading stream:', readError);
+          console.error('❌ Error reading stream:', readError);
           // If streaming fails, fall back to regular chat
           throw readError;
         }
@@ -743,10 +761,20 @@ const ChatPage: React.FC = () => {
         setMessages(prev => [...prev, assistantMessage]);
       } else {
         // Fallback to regular chat endpoint
-        const fallbackResponse = await fetch(`http://localhost:8003/api/v1/gateway/chat/?question=${encodeURIComponent(currentQuestion)}`, {
+        console.log(`❌ Streaming failed with status ${response.status}, falling back to regular chat endpoint`);
+        let fallbackResponse = await fetch(`http://localhost:8003/api/v1/gateway/chat?question=${encodeURIComponent(currentQuestion)}`, {
           method: 'GET',
           headers: getAuthHeaders(),
         });
+
+        // If that fails, try with trailing slash
+        if (!fallbackResponse.ok && (fallbackResponse.status === 404 || fallbackResponse.status === 405)) {
+          console.log('Regular chat endpoint failed, trying with trailing slash...');
+          fallbackResponse = await fetch(`http://localhost:8003/api/v1/gateway/chat/?question=${encodeURIComponent(currentQuestion)}`, {
+            method: 'GET',
+            headers: getAuthHeaders(),
+          });
+        }
 
         if (fallbackResponse.ok) {
           const contentType = fallbackResponse.headers.get('content-type');

@@ -15,3 +15,6 @@ class Dependencies:
     def get_avaliable_modules(self) -> str:
         """..."""
         return ", ".join(module for module in self.available_modules)
+
+    def get_imputed_modules(self) -> Dict[str, ModuleType]:
+        return self.imported_modules
