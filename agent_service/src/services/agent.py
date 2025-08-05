@@ -125,13 +125,13 @@ class AgentService(BaseModel):
         yield "🧠 Step 1: Task Classification\n"
         yield "🔍 Understanding your question...\n"
         tasks = self.task_classification_runner.classify(question)
-        yield f"✅ Identified task(s): `{tasks}`\n\n"
+        yield f"✅ Identified task(s): `{', '.join(task.lower() for task in tasks)}`\n\n"
 
         # Step 2: Subtask Classification
         yield "🧠 Step 2: Subtask Classification\n"
         yield "🔍 Breaking down tasks into smaller subtasks...\n"
         subtasks = self.subtask_classification_runner.classify(question, tasks)
-        yield f"✅ Subtasks: `{subtasks}`\n\n"
+        yield f"✅ Subtasks: `{', '.join(subtask.lower() for subtask in subtasks)}`\n\n"
 
         # Step 3: Solution Planning
         yield "🧠 Step 3: Solution Planning\n"
