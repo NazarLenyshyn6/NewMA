@@ -36,6 +36,7 @@ from agent.registry.runners.code.execution import (
     code_execution_runner,
 )
 
+from agent.reporters import generate_report
 from agent.registry.memory.planners import solution_planner_memory_manager
 
 
@@ -208,18 +209,20 @@ class AgentService(BaseModel):
             yield code_execution_result
         else:
             # Extract analysis_report
-            analysis_report = code_execution_result.get("analysis_report", [])
-
-            # Stream each analysis step nicely
             yield "\n🧾 Analysis Report:\n"
+            analysis_report = code_execution_result.get("analysis_report", [])
+            formatted_analysis_report = []
             for idx, step in enumerate(analysis_report, 1):
-                # Each step is a dict with keys like 'step', 'why', 'finding', 'action'
-                yield (
+                formatted_analysis_report.append(
                     f"Step {idx}: {step.get('step', '')}\n"
                     f"  Why: {step.get('why', '')}\n"
                     f"  Finding: {step.get('finding', '')}\n"
-                    f"  Action: {step.get('action', '')}\n\n"
+                    f"  Action: {step.get('action', '')}\n"
                 )
+            report = "\n".join(formatted_analysis_report)
+
+            async for chunk in generate_report(report):
+                yield chunk
 
 
 agent_service = AgentService(

@@ -22,6 +22,12 @@ class SolutionPlanningPromptTemplate:
                     "to approach the user’s problem efficiently and logically. "
                     "Do not include code. Do not mention code. Do not include data ingestion steps. "
                     "Assume the data is already imported and available."
+                    "**OUTPUT FORMAT REQUIREMENTS:**\n"
+                    "- Provide the step-by-step plan strictly as plain text.\n"
+                    "- Do NOT include any markdown syntax, code blocks, or special formatting.\n"
+                    "- Structure the output as numbered steps or bullet points using plain text only.\n"
+                    "- The output must be directly usable as a Python multiline string literal content without further cleaning.\n"
+                    "- Avoid any characters or formatting that would break Python string syntax or require additional processing.\n"
                 ),
                 HumanMessagePromptTemplate.from_template(
                     "Here is the previous context (if any):\n\n"

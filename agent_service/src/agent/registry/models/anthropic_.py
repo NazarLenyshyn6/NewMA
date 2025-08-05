@@ -26,6 +26,16 @@ anthropic_code_stitching_model = ChatAnthropic(
     model_name="claude-sonnet-4-20250514",
     anthropic_api_key=settings.anthropic_model.ANTHROPIC_API_KEY,
     temperature=0.0,
+    max_tokens=50000,
+    top_k=None,
+    top_p=1,
+    streaming=True,
+)
+
+anthropic_summary_reporting_model = ChatAnthropic(
+    model_name="claude-sonnet-4-20250514",
+    anthropic_api_key=settings.anthropic_model.ANTHROPIC_API_KEY,
+    temperature=0.4,
     max_tokens=4000,
     top_k=None,
     top_p=1,
