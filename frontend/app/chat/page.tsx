@@ -51,6 +51,7 @@ const ChatPage: React.FC = () => {
   const [uploadError, setUploadError] = useState('');
   const [settingActiveFile, setSettingActiveFile] = useState<string | null>(null);
   const [activeFile, setActiveFile] = useState<FileItem | null>(null);
+  const [sessionActiveFiles, setSessionActiveFiles] = useState<{[sessionId: string]: string | null}>({});
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [streamingMessage, setStreamingMessage] = useState('');
   const [showDeleteSessionModal, setShowDeleteSessionModal] = useState(false);
@@ -287,15 +288,35 @@ const ChatPage: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setActiveFile(data);
+        // Store active file name for current session
+        if (currentSession) {
+          setSessionActiveFiles(prev => ({
+            ...prev,
+            [currentSession.id]: data?.file_name || null
+          }));
+        }
+        console.log(`Active file for session ${currentSession?.title}:`, data?.file_name || 'None');
       } else {
         console.error('Failed to get active file');
         setActiveFile(null);
+        // Clear active file for current session
+        if (currentSession) {
+          setSessionActiveFiles(prev => ({
+            ...prev,
+            [currentSession.id]: null
+          }));
+        }
       }
     } catch (error) {
       console.error('Error getting active file:', error);
       setActiveFile(null);
-    } finally {
-      // Removed setLoadingActiveFile call
+      // Clear active file for current session
+      if (currentSession) {
+        setSessionActiveFiles(prev => ({
+          ...prev,
+          [currentSession.id]: null
+        }));
+      }
     }
   }, [currentSession]);
 
@@ -315,8 +336,19 @@ const ChatPage: React.FC = () => {
       });
 
       if (response.ok) {
+        // Immediately update the active file for visual feedback
+        const selectedFile = files.find(f => f.file_name === fileName);
+        if (selectedFile) {
+          setActiveFile(selectedFile);
+        }
+        // Update sessionActiveFiles state immediately
+        setSessionActiveFiles(prev => ({
+          ...prev,
+          [currentSession.id]: fileName
+        }));
         await loadFiles();
         await getActiveFile();
+        console.log(`Successfully set ${fileName} as active file for session ${currentSession.title}`);
       } else {
         console.error('Failed to set active file');
       }
@@ -354,6 +386,10 @@ const ChatPage: React.FC = () => {
 
       if (response.ok) {
         await loadFiles();
+        // Automatically set the uploaded file as active for current session
+        if (currentSession) {
+          await setActiveFileForSession(fileName.trim());
+        }
         setShowUploadModal(false);
         setSelectedFile(null);
         setFileName('');
@@ -444,7 +480,8 @@ const ChatPage: React.FC = () => {
         setCurrentSession(session);
         loadMessages(session.id);
         loadFiles();
-        getActiveFile();
+        // Ensure we get the active file for this session
+        await getActiveFile();
         localStorage.setItem('activeSessionId', session.id);
         localStorage.setItem('activeSessionTitle', session.title);
       }
@@ -455,6 +492,11 @@ const ChatPage: React.FC = () => {
 
   // Delete session
   const deleteSession = async (session: Session) => {
+    // Check if this is the currently active session
+    if (currentSession?.id === session.id) {
+      alert(`Cannot delete "${session.title}" because it is currently active. Please switch to a different session first.`);
+      return;
+    }
     setSessionToDelete(session);
     setShowDeleteSessionModal(true);
   };
@@ -499,6 +541,11 @@ const ChatPage: React.FC = () => {
 
   // Delete file
   const deleteFile = async (file: FileItem) => {
+    // Check if this file is currently active
+    if (activeFile?.file_name === file.file_name) {
+      alert(`Cannot delete "${file.file_name}" because it is currently active for this session. Please select a different file first.`);
+      return;
+    }
     setFileToDelete(file);
     setShowDeleteFileModal(true);
   };
@@ -665,7 +712,8 @@ const ChatPage: React.FC = () => {
       if (savedSession) {
         setCurrentSession(savedSession);
         loadMessages(savedSession.id);
-        getActiveFile();
+        // Ensure we get the active file for this restored session
+        await getActiveFile();
       } else {
         localStorage.removeItem('activeSessionId');
         localStorage.removeItem('activeSessionTitle');
@@ -775,13 +823,33 @@ const ChatPage: React.FC = () => {
                       {session.title}
                     </span>
                     <span className="text-sm opacity-75 truncate block font-medium">
-                      {new Date(session.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                      {session.created_at && !isNaN(new Date(session.created_at).getTime()) 
+                        ? new Date(session.created_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })
+                        : 'Recent'
+                      }
                     </span>
+                    {/* Active file indicator */}
+                    {(() => {
+                      const activeFileName = currentSession?.id === session.id ? activeFile?.file_name : sessionActiveFiles[session.id];
+                      return activeFileName ? (
+                        <div className="flex items-center space-x-2 mt-3 px-3 py-2 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 rounded-xl text-xs font-bold shadow-md border border-emerald-200">
+                          <File className="w-3.5 h-3.5" />
+                          <span className="truncate max-w-[100px]">
+                            📊 {activeFileName}
+                          </span>
+                          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-sm"></div>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-400 mt-2 px-3 italic">
+                          No dataset selected
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="flex items-center space-x-3">
                     <MessageSquare className={`w-5 h-5 transition-all duration-200 ${
@@ -794,8 +862,13 @@ const ChatPage: React.FC = () => {
                         e.stopPropagation();
                         deleteSession(session);
                       }}
-                      className="p-2 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-500 transition-all duration-200 shadow-sm hover:shadow-md hover:scale-110"
-                      title="Delete session"
+                      disabled={currentSession?.id === session.id}
+                      className={`p-2 rounded-xl transition-all duration-200 shadow-sm ${
+                        currentSession?.id === session.id
+                          ? 'opacity-30 cursor-not-allowed text-gray-400'
+                          : 'opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-500 hover:shadow-md hover:scale-110'
+                      }`}
+                      title={currentSession?.id === session.id ? 'Cannot delete active session' : 'Delete session'}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -1225,8 +1298,13 @@ const ChatPage: React.FC = () => {
                               e.stopPropagation();
                               deleteFile(file);
                             }}
-                            className="p-2.5 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-500 transition-all duration-200 shadow-sm hover:shadow-md hover:scale-110"
-                            title="Delete file"
+                            disabled={activeFile?.file_name === file.file_name}
+                            className={`p-2.5 rounded-xl transition-all duration-200 shadow-sm ${
+                              activeFile?.file_name === file.file_name
+                                ? 'opacity-30 cursor-not-allowed text-gray-400'
+                                : 'opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-500 hover:shadow-md hover:scale-110'
+                            }`}
+                            title={activeFile?.file_name === file.file_name ? 'Cannot delete active file' : 'Delete file'}
                           >
                             <Trash2 className="w-5 h-5" />
                           </button>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 
 interface LoginFormData {
@@ -9,6 +10,7 @@ interface LoginFormData {
 }
 
 const LoginPage: React.FC = () => {
+  const router = useRouter();
   const [formData, setFormData] = useState<LoginFormData>({
     email: '',
     password: '',
@@ -49,7 +51,7 @@ const LoginPage: React.FC = () => {
         localStorage.setItem('isNewLogin', 'true');
         console.log('Login successful');
         // Redirect to chat - the chat page will automatically create and load the new session
-        window.location.href = '/chat';
+        router.push('/chat');
       } else {
         // Handle login error
         console.error('Login failed');
@@ -64,8 +66,8 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-50 to-green-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl overflow-hidden max-w-6xl w-full grid grid-cols-1 lg:grid-cols-2">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl border-2 border-blue-100 overflow-hidden max-w-6xl w-full grid grid-cols-1 lg:grid-cols-2">
         {/* Left Side - Login Form */}
         <div className="p-12 flex flex-col justify-center">
           <div className="max-w-md w-full mx-auto">
@@ -84,7 +86,7 @@ const LoginPage: React.FC = () => {
                   value={formData.email}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition-all"
+                  className="w-full px-4 py-4 bg-blue-50 border-2 border-blue-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition-all shadow-sm hover:shadow-md"
                 />
               </div>
 
@@ -96,7 +98,7 @@ const LoginPage: React.FC = () => {
                   value={formData.password}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition-all pr-12"
+                  className="w-full px-4 py-4 bg-blue-50 border-2 border-blue-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition-all shadow-sm hover:shadow-md pr-12"
                 />
                 <button
                   type="button"
@@ -110,14 +112,14 @@ const LoginPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-gray-800 text-white py-4 rounded-xl font-semibold hover:bg-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-4 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-lg"
               >
                 {isLoading ? 'Signing In...' : 'Sign In'}
               </button>
 
               <div className="text-center text-sm text-gray-600 mt-6">
                 Don&apos;t have an account?{' '}
-                <a href="/register" className="text-gray-800 font-semibold hover:underline">
+                <a href="/register" className="text-blue-600 font-semibold hover:text-blue-800 hover:underline transition-colors">
                   Sign Up
                 </a>
               </div>
@@ -126,7 +128,7 @@ const LoginPage: React.FC = () => {
         </div>
 
         {/* Right Side - ML Agent Information */}
-        <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-12 flex flex-col justify-center text-white relative overflow-hidden">
+        <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-12 flex flex-col justify-center text-white relative overflow-hidden">
           {/* Decorative geometric shapes */}
           <div className="absolute top-10 right-10 w-20 h-20 border border-green-400 rounded-lg transform rotate-12 opacity-30"></div>
           <div className="absolute bottom-20 left-10 w-6 h-6 bg-yellow-400 rounded-full opacity-40"></div>
