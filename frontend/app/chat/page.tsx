@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2 } from 'lucide-react';
+import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info } from 'lucide-react';
 
 interface Session {
   id: string;
@@ -60,6 +60,9 @@ const ChatPage: React.FC = () => {
   const [fileToDelete, setFileToDelete] = useState<FileItem | null>(null);
   const [deletingSession, setDeletingSession] = useState(false);
   const [deletingFile, setDeletingFile] = useState(false);
+  const [showDatasetInfoTab, setShowDatasetInfoTab] = useState(false);
+  const [selectedDatasetInfo, setSelectedDatasetInfo] = useState<FileItem | null>(null);
+  const [loadingDatasetInfo, setLoadingDatasetInfo] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -217,8 +220,11 @@ const ChatPage: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setMessages(data);
+      } else if (response.status === 404) {
+        console.log(`Messages endpoint not found for session ${sessionId}, starting with empty messages`);
+        setMessages([]);
       } else {
-        console.error('Failed to load messages');
+        console.error(`Failed to load messages, status: ${response.status}`);
         setMessages([]);
       }
     } catch (error) {
@@ -230,7 +236,7 @@ const ChatPage: React.FC = () => {
   // Load sessions from API
   const loadSessions = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8003/api/v1/gateway/sessions/', {
+      const response = await fetch('http://localhost:8003/api/v1/gateway/sessions', {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -252,7 +258,7 @@ const ChatPage: React.FC = () => {
   const loadFiles = useCallback(async () => {
     setLoadingFiles(true);
     try {
-      const response = await fetch('http://localhost:8003/api/v1/gateway/files/', {
+      const response = await fetch('http://localhost:8003/api/v1/gateway/files', {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -280,43 +286,40 @@ const ChatPage: React.FC = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:8003/api/v1/gateway/files/active/', {
+      console.log(`Getting active file for session: ${currentSession.title}`);
+      
+      // Try the files/active endpoint first
+      let response = await fetch('http://localhost:8003/api/v1/gateway/files/active', {
         method: 'GET',
         headers: getAuthHeaders(),
       });
 
+      // If that fails with 405 or 404, try alternative approaches
+      if (!response.ok && (response.status === 405 || response.status === 404)) {
+        console.log(`GET /files/active failed with ${response.status}, trying alternative...`);
+        
+        // Clear active file state since we can't retrieve it
+        setActiveFile(null);
+        console.log(`Cleared active file for session ${currentSession.title} due to endpoint unavailability`);
+        return;
+      }
+
       if (response.ok) {
         const data = await response.json();
+        console.log('Active file response:', data);
+        
+        // Set active file state for current session only
         setActiveFile(data);
-        // Store active file name for current session
-        if (currentSession) {
-          setSessionActiveFiles(prev => ({
-            ...prev,
-            [currentSession.id]: data?.file_name || null
-          }));
-        }
-        console.log(`Active file for session ${currentSession?.title}:`, data?.file_name || 'None');
+        console.log(`Updated active file for current session ${currentSession.title}: ${data?.file_name || 'None'}`);
+        
       } else {
-        console.error('Failed to get active file');
+        console.log(`Failed to get active file, status: ${response.status}`);
         setActiveFile(null);
-        // Clear active file for current session
-        if (currentSession) {
-          setSessionActiveFiles(prev => ({
-            ...prev,
-            [currentSession.id]: null
-          }));
-        }
+        console.log(`Cleared active file for session ${currentSession.title}`);
       }
     } catch (error) {
       console.error('Error getting active file:', error);
       setActiveFile(null);
-      // Clear active file for current session
-      if (currentSession) {
-        setSessionActiveFiles(prev => ({
-          ...prev,
-          [currentSession.id]: null
-        }));
-      }
     }
   }, [currentSession]);
 
@@ -327,7 +330,8 @@ const ChatPage: React.FC = () => {
     setSettingActiveFile(fileName);
     
     try {
-      const response = await fetch('http://localhost:8003/api/v1/gateway/files/active/', {
+      // Try with trailing slash first (as documented)
+      let response = await fetch('http://localhost:8003/api/v1/gateway/files/active/', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -335,25 +339,45 @@ const ChatPage: React.FC = () => {
         }),
       });
 
+      // If that fails with 405, try without trailing slash
+      if (!response.ok && response.status === 405) {
+        console.log('POST /files/active/ failed with 405, trying without trailing slash...');
+        response = await fetch('http://localhost:8003/api/v1/gateway/files/active', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            file_name: fileName,
+          }),
+        });
+      }
+
       if (response.ok) {
         // Immediately update the active file for visual feedback
         const selectedFile = files.find(f => f.file_name === fileName);
         if (selectedFile) {
           setActiveFile(selectedFile);
         }
-        // Update sessionActiveFiles state immediately
-        setSessionActiveFiles(prev => ({
-          ...prev,
-          [currentSession.id]: fileName
-        }));
+        // The active file state is already updated above for immediate visual feedback
         await loadFiles();
         await getActiveFile();
         console.log(`Successfully set ${fileName} as active file for session ${currentSession.title}`);
       } else {
-        console.error('Failed to set active file');
+        console.error(`Failed to set active file, status: ${response.status}`);
+        // Still update the UI optimistically
+        const selectedFile = files.find(f => f.file_name === fileName);
+        if (selectedFile) {
+          setActiveFile(selectedFile);
+          console.log(`Set active file locally despite API failure: ${fileName}`);
+        }
       }
     } catch (error) {
       console.error('Error setting active file:', error);
+      // Still update the UI optimistically
+      const selectedFile = files.find(f => f.file_name === fileName);
+      if (selectedFile) {
+        setActiveFile(selectedFile);
+        console.log(`Set active file locally due to network error: ${fileName}`);
+      }
     } finally {
       setSettingActiveFile(null);
     }
@@ -376,7 +400,7 @@ const ChatPage: React.FC = () => {
       formData.append('file_name', fileName.trim());
       formData.append('description', fileDescription.trim());
 
-      const response = await fetch('http://localhost:8003/api/v1/gateway/files/', {
+      const response = await fetch('http://localhost:8003/api/v1/gateway/files', {
         method: 'POST',
         headers: {
           'Authorization': `${localStorage.getItem('token_type')} ${localStorage.getItem('access_token')}`,
@@ -435,7 +459,6 @@ const ChatPage: React.FC = () => {
         setNewSessionName('');
         
         loadFiles();
-        getActiveFile();
         
         localStorage.setItem('activeSessionId', newSession.id);
         localStorage.setItem('activeSessionTitle', newSession.title);
@@ -448,6 +471,9 @@ const ChatPage: React.FC = () => {
               title: newSession.title,
             }),
           });
+          
+          // After setting session as active, get the active file
+          await getActiveFile();
         } catch (error) {
           console.error('Failed to set new session as active:', error);
         }
@@ -468,6 +494,7 @@ const ChatPage: React.FC = () => {
     if (currentSession?.id === session.id) return;
 
     try {
+      console.log(`Switching to session: ${session.title}`);
       const response = await fetch(`http://localhost:8003/api/v1/gateway/sessions/active/${session.title}`, {
         method: 'POST',
         headers: getAuthHeaders(),
@@ -477,13 +504,25 @@ const ChatPage: React.FC = () => {
       });
 
       if (response.ok) {
+        console.log(`Successfully set session ${session.title} as active`);
+        
+        // Set the current session first
         setCurrentSession(session);
+        
+        // Load session data
         loadMessages(session.id);
         loadFiles();
-        // Ensure we get the active file for this session
-        await getActiveFile();
+        
+        // Store session info
         localStorage.setItem('activeSessionId', session.id);
         localStorage.setItem('activeSessionTitle', session.title);
+        
+        // Now get the active file for this session - this will update sessionActiveFiles
+        await getActiveFile();
+        
+        console.log(`Session switch complete for: ${session.title}`);
+      } else {
+        console.error('Failed to set session as active on backend');
       }
     } catch (error) {
       console.error('Error switching session:', error);
@@ -536,6 +575,57 @@ const ChatPage: React.FC = () => {
       setDeletingSession(false);
       setShowDeleteSessionModal(false);
       setSessionToDelete(null);
+    }
+  };
+
+  // Get dataset info
+  const getDatasetInfo = async (fileName: string) => {
+    setLoadingDatasetInfo(true);
+    try {
+      // First set the file as active to get its detailed info
+      let response = await fetch('http://localhost:8003/api/v1/gateway/files/active/', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          file_name: fileName,
+        }),
+      });
+
+      // If that fails with 405, try without trailing slash
+      if (!response.ok && response.status === 405) {
+        console.log('POST /files/active/ failed with 405 for dataset info, trying without trailing slash...');
+        response = await fetch('http://localhost:8003/api/v1/gateway/files/active', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            file_name: fileName,
+          }),
+        });
+      }
+
+      if (response.ok) {
+        // Now get the active file details
+        const activeResponse = await fetch('http://localhost:8003/api/v1/gateway/files/active', {
+          method: 'GET',
+          headers: getAuthHeaders(),
+        });
+
+        if (activeResponse.ok) {
+          const datasetInfo = await activeResponse.json();
+          setSelectedDatasetInfo(datasetInfo);
+          setShowDatasetInfoTab(true);
+        } else {
+          console.error('Failed to get dataset info after setting file as active');
+        }
+      } else {
+        console.error(`Failed to set file as active for info retrieval, status: ${response.status}`);
+        // Show an error message to the user
+        alert(`Unable to retrieve dataset information. The backend may not support this feature yet.`);
+      }
+    } catch (error) {
+      console.error('Error getting dataset info:', error);
+    } finally {
+      setLoadingDatasetInfo(false);
     }
   };
 
@@ -710,11 +800,15 @@ const ChatPage: React.FC = () => {
     if (savedSessionId && savedSessionTitle && sessions.length > 0) {
       const savedSession = sessions.find(s => s.id === savedSessionId && s.title === savedSessionTitle);
       if (savedSession) {
+        console.log(`Restoring active session: ${savedSession.title}`);
         setCurrentSession(savedSession);
         loadMessages(savedSession.id);
+        
         // Ensure we get the active file for this restored session
         await getActiveFile();
+        console.log(`Session restoration complete for: ${savedSession.title}`);
       } else {
+        console.log('Saved session not found, clearing localStorage');
         localStorage.removeItem('activeSessionId');
         localStorage.removeItem('activeSessionTitle');
       }
@@ -833,23 +927,24 @@ const ChatPage: React.FC = () => {
                         : 'Recent'
                       }
                     </span>
-                    {/* Active file indicator */}
-                    {(() => {
-                      const activeFileName = currentSession?.id === session.id ? activeFile?.file_name : sessionActiveFiles[session.id];
-                      return activeFileName ? (
-                        <div className="flex items-center space-x-2 mt-3 px-3 py-2 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 rounded-xl text-xs font-bold shadow-md border border-emerald-200">
-                          <File className="w-3.5 h-3.5" />
-                          <span className="truncate max-w-[100px]">
-                            📊 {activeFileName}
-                          </span>
-                          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-sm"></div>
-                        </div>
-                      ) : (
-                        <div className="text-xs text-gray-400 mt-2 px-3 italic">
-                          No dataset selected
-                        </div>
-                      );
-                    })()}
+                    {/* Active file indicator - only show for currently active session */}
+                    {currentSession?.id === session.id && (
+                      <>
+                        {activeFile?.file_name ? (
+                          <div className="flex items-center space-x-2 mt-3 px-3 py-2 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 rounded-xl text-xs font-bold shadow-md border border-emerald-200">
+                            <File className="w-3.5 h-3.5" />
+                            <span className="truncate max-w-[100px]">
+                              📊 {activeFile.file_name}
+                            </span>
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-sm"></div>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-400 mt-2 px-3 italic">
+                            No dataset selected
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                   <div className="flex items-center space-x-3">
                     <MessageSquare className={`w-5 h-5 transition-all duration-200 ${
@@ -1185,35 +1280,133 @@ const ChatPage: React.FC = () => {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-4">
               <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-                <Database className="w-6 h-6 text-white" />
+                {showDatasetInfoTab ? <Info className="w-6 h-6 text-white" /> : <Database className="w-6 h-6 text-white" />}
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">Dataset Files</h2>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  {showDatasetInfoTab ? 'Dataset Information' : 'Dataset Files'}
+                </h2>
                 <p className="text-sm text-blue-600 font-medium">
-                  {files.length} file{files.length !== 1 ? 's' : ''} available
+                  {showDatasetInfoTab 
+                    ? 'Detailed analysis summary' 
+                    : `${files.length} file${files.length !== 1 ? 's' : ''} available`
+                  }
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => setRightSidebarOpen(false)}
-              className="p-2.5 hover:bg-blue-100 rounded-xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-110"
-            >
-              <X className="w-6 h-6 text-blue-500 group-hover:text-blue-700" />
-            </button>
+            <div className="flex items-center space-x-2">
+              {showDatasetInfoTab && (
+                <button
+                  onClick={() => {
+                    setShowDatasetInfoTab(false);
+                    setSelectedDatasetInfo(null);
+                  }}
+                  className="p-2.5 hover:bg-blue-100 rounded-xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-110"
+                  title="Back to files"
+                >
+                  <ArrowRight className="w-6 h-6 text-blue-500 group-hover:text-blue-700 rotate-180" />
+                </button>
+              )}
+              <button
+                onClick={() => setRightSidebarOpen(false)}
+                className="p-2.5 hover:bg-blue-100 rounded-xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-110"
+              >
+                <X className="w-6 h-6 text-blue-500 group-hover:text-blue-700" />
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="w-full flex items-center justify-center space-x-4 px-6 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-2xl transition-all duration-300 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] hover:-translate-y-0.5"
-          >
-            <Upload className="w-5 h-5" />
-            <span>Upload Dataset</span>
-            <div className="w-2 h-2 bg-white/40 rounded-full animate-pulse"></div>
-          </button>
+          {!showDatasetInfoTab && (
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="w-full flex items-center justify-center space-x-4 px-6 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-2xl transition-all duration-300 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] hover:-translate-y-0.5"
+            >
+              <Upload className="w-5 h-5" />
+              <span>Upload Dataset</span>
+              <div className="w-2 h-2 bg-white/40 rounded-full animate-pulse"></div>
+            </button>
+          )}
         </div>
 
-        {/* Files List */}
+        {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-8 space-y-6">
-          {loadingFiles ? (
+          {showDatasetInfoTab && selectedDatasetInfo ? (
+            /* Dataset Info Tab */
+            <div className="space-y-6">
+              {/* Dataset Name */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-100 shadow-md">
+                <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center">
+                  <File className="w-5 h-5 mr-3 text-blue-600" />
+                  Dataset Name
+                </h3>
+                <p className="text-xl font-semibold text-blue-700 bg-white px-4 py-3 rounded-xl shadow-sm border border-blue-200">
+                  {selectedDatasetInfo.file_name}
+                </p>
+              </div>
+
+              {/* Description */}
+              {selectedDatasetInfo.description && (
+                <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl p-6 border-2 border-emerald-100 shadow-md">
+                  <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center">
+                    <FileText className="w-5 h-5 mr-3 text-emerald-600" />
+                    Description
+                  </h3>
+                  <p className="text-gray-700 bg-white px-4 py-3 rounded-xl shadow-sm border border-emerald-200 leading-relaxed">
+                    {selectedDatasetInfo.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Summary */}
+              {selectedDatasetInfo.summary && (
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-purple-100 shadow-md">
+                  <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center">
+                    <Database className="w-5 h-5 mr-3 text-purple-600" />
+                    Data Summary
+                  </h3>
+                  <div className="bg-white px-4 py-3 rounded-xl shadow-sm border border-purple-200">
+                    <div className="prose prose-sm max-w-none text-gray-700">
+                      {selectedDatasetInfo.summary.split('\n').map((line, index) => (
+                        <div key={index} className="mb-2">
+                          {line.startsWith('**') && line.endsWith('**') ? (
+                            <strong className="text-purple-700">{line.slice(2, -2)}</strong>
+                          ) : line.startsWith('- **') ? (
+                            <div className="ml-4 flex items-start">
+                              <span className="text-purple-600 mr-2">•</span>
+                              <span dangerouslySetInnerHTML={{ 
+                                __html: line.slice(2).replace(/\*\*(.*?)\*\*/g, '<strong class="text-purple-700">$1</strong>') 
+                              }} />
+                            </div>
+                          ) : (
+                            <span dangerouslySetInnerHTML={{ 
+                              __html: line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-purple-700">$1</strong>') 
+                            }} />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Set Active Button */}
+              <div className="sticky bottom-0 bg-white pt-4 border-t border-blue-100">
+                <button
+                  onClick={async () => {
+                    if (currentSession && selectedDatasetInfo) {
+                      await setActiveFileForSession(selectedDatasetInfo.file_name);
+                      setShowDatasetInfoTab(false);
+                      setSelectedDatasetInfo(null);
+                    }
+                  }}
+                  disabled={!currentSession}
+                  className="w-full px-6 py-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-2xl transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-3"
+                >
+                  <Database className="w-5 h-5" />
+                  <span>Set as Active Dataset</span>
+                </button>
+              </div>
+            </div>
+          ) : loadingFiles ? (
             <div className="flex items-center justify-center py-16">
               <div className="flex flex-col items-center space-y-6">
                 <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin shadow-lg"></div>
@@ -1293,6 +1486,20 @@ const ChatPage: React.FC = () => {
                           {settingActiveFile === file.file_name && (
                             <div className="w-6 h-6 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin shadow-md"></div>
                           )}
+                          {loadingDatasetInfo && selectedDatasetInfo?.file_name === file.file_name && (
+                            <div className="w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full animate-spin shadow-md"></div>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              getDatasetInfo(file.file_name);
+                            }}
+                            disabled={loadingDatasetInfo}
+                            className="opacity-0 group-hover:opacity-100 p-2.5 rounded-xl transition-all duration-200 shadow-sm hover:bg-blue-100 hover:text-blue-600 hover:shadow-md hover:scale-110"
+                            title="View dataset information"
+                          >
+                            <Info className="w-5 h-5" />
+                          </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1472,6 +1679,7 @@ const ChatPage: React.FC = () => {
         </div>
       )}
       
+
       {/* Delete Session Confirmation Modal */}
       {showDeleteSessionModal && sessionToDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
