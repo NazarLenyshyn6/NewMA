@@ -198,14 +198,17 @@ class AgentService(BaseModel):
             storage_uri=storage_uri,
             code=code,
             dependencies=dependencies[0].get_imputed_modules(),
+            max_attempts=3,
         ):
             if isinstance(chunk, dict):
                 variables = chunk
                 break
+            if chunk == "Failed":
+                break
             yield chunk
 
         if variables is None:
-            return
+            yield "Failed."
         else:
             # Extract analysis_report
             yield "\n🧾 Analysis Report:\n"

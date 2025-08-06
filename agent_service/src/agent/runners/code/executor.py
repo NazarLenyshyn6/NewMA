@@ -22,12 +22,13 @@ class CodeExecutionRunner(BaseModel):
     @staticmethod
     def _extract_code(message: str) -> Optional[str]:
         """..."""
-        pattern = r"```python\s*\n(.*?)\n```"
+        pattern = r"```(?:python)?\n(.*?)(?:\n```)?$"
+        match = re.search(pattern, message.strip(), re.DOTALL)
 
-        match = re.search(pattern, message, re.DOTALL)
-        if match:
-            return match.group(1)
-        return None
+        if not match:
+            return None
+
+        return match.group(1).strip()
 
     async def execute(
         self,
@@ -42,7 +43,7 @@ class CodeExecutionRunner(BaseModel):
         max_attempts: int = 5,
     ):
         if current_attempt > max_attempts:
-            yield None
+            yield "Failed"
 
         variables = self.memory_manager.get_code_variables_history(
             db=db,
@@ -73,6 +74,7 @@ class CodeExecutionRunner(BaseModel):
                 yield chunk
 
             fixed_code = self._extract_code("".join(code_fixing_message))
+            print(fixed_code)
             async for result in self.execute(
                 db=db,
                 user_id=user_id,
