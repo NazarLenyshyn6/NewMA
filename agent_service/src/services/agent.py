@@ -188,7 +188,9 @@ class AgentService(BaseModel):
         yield "🧠 Step 6: Code Execution\n"
         yield "🚀 Running the final code...\n"
         code = re.sub(r"```(?:python)?\n?", "", code).strip()
-        code_execution_result = self.code_execution_runner.execute(
+
+        variables = None
+        async for chunk in self.code_execution_runner.execute(
             db=db,
             session_id=session_id,
             user_id=user_id,
@@ -196,13 +198,18 @@ class AgentService(BaseModel):
             storage_uri=storage_uri,
             code=code,
             dependencies=dependencies[0].get_imputed_modules(),
-        )
-        if isinstance(code_execution_result, str):
-            yield code_execution_result
+        ):
+            if isinstance(chunk, dict):
+                variables = chunk
+                break
+            yield chunk
+
+        if variables is None:
+            return
         else:
             # Extract analysis_report
             yield "\n🧾 Analysis Report:\n"
-            analysis_report = code_execution_result.get("analysis_report", [])
+            analysis_report = variables.get("analysis_report", [])
             formatted_analysis_report = []
             for idx, step in enumerate(analysis_report, 1):
                 formatted_analysis_report.append(
@@ -234,7 +241,7 @@ class AgentService(BaseModel):
                 session_id=session_id,
                 file_name=file_name,
                 storage_uri=storage_uri,
-                new_code_variables=code_execution_result,
+                new_code_variables=variables,
             )
 
             code_generator_memory_manager.update_code_history(

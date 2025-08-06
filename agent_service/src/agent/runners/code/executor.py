@@ -1,20 +1,35 @@
 """..."""
 
+import re
 from uuid import UUID
 from types import ModuleType
+from typing import AsyncGenerator, Optional
+
 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from agent.memory.code.variables import CodeVariablesMemoryManager
+from agent.code.debagger import CodeDebagger
 
 
 class CodeExecutionRunner(BaseModel):
     """..."""
 
     memory_manager: CodeVariablesMemoryManager
+    code_debagger: CodeDebagger
 
-    def execute(
+    @staticmethod
+    def _extract_code(message: str) -> Optional[str]:
+        """..."""
+        pattern = r"```python\s*\n(.*?)\n```"
+
+        match = re.search(pattern, message, re.DOTALL)
+        if match:
+            return match.group(1)
+        return None
+
+    async def execute(
         self,
         db: Session,
         user_id: int,
@@ -23,8 +38,11 @@ class CodeExecutionRunner(BaseModel):
         storage_uri: str,
         code: str,
         dependencies: dict,
-    ) -> dict:
-        """..."""
+        current_attempt: int = 1,
+        max_attempts: int = 5,
+    ):
+        if current_attempt > max_attempts:
+            yield None
 
         variables = self.memory_manager.get_code_variables_history(
             db=db,
@@ -36,17 +54,34 @@ class CodeExecutionRunner(BaseModel):
 
         global_context = dependencies.copy()
         local_context = variables.copy()
-
         global_context.update(local_context)
 
         try:
             exec(code, global_context)
+
             local_context = {
                 k: v
                 for k, v in global_context.items()
                 if k not in dependencies and not isinstance(v, ModuleType)
             }
-            return local_context
+            yield local_context
 
         except Exception as e:
-            return f"Exception during code execution: \n{e}"
+            code_fixing_message = []
+            async for chunk in self.code_debagger.debug(code, str(e), dependencies):
+                code_fixing_message.append(chunk)
+                yield chunk
+
+            fixed_code = self._extract_code("".join(code_fixing_message))
+            async for result in self.execute(
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+                code=fixed_code if fixed_code else code,
+                dependencies=dependencies,
+                current_attempt=current_attempt + 1,
+                max_attempts=max_attempts,
+            ):
+                yield result
