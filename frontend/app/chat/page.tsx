@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info, Save } from 'lucide-react';
+import { apiEndpoints } from '@/lib/api';
 
 interface Session {
   id: string;
@@ -243,56 +244,130 @@ const ChatPage: React.FC = () => {
   // Load chat history from chat history service
   const loadChatHistory = useCallback(async () => {
     try {
-      console.log('🔍 TRIGGERING CHAT HISTORY ENDPOINT:', 'http://127.0.0.1:8005/api/v1/chat_history');
-      const response = await fetch('http://127.0.0.1:8005/api/v1/chat_history', {
+      // Clear existing messages immediately to show loading state
+      setMessages([]);
+      
+      // Get current values at time of call
+      const sessionInfo = { sessionId: currentSession?.id, sessionTitle: currentSession?.title };
+      const activeFileName = activeFile?.file_name || 'None';
+      
+      console.log('🔍 TRIGGERING CHAT HISTORY ENDPOINT:', apiEndpoints.chatHistory);
+      console.log('📤 Expected response format: [{"question": "...", "answer": "..."}]');
+      console.log('📋 Current session info:', sessionInfo);
+      console.log('📁 Active file:', activeFileName);
+      
+      // TEST MODE: Set this to true to test with sample data without backend
+      const TEST_MODE = false;
+      if (TEST_MODE) {
+        const testChatHistory = [
+          {
+            "question": "check data types",
+            "answer": "DATA TYPE OPTIMIZATION ANALYSIS SUMMARY\n\nOVERVIEW:\nAnalyzed 11 columns in a hypertension dataset to optimize data types for improved analysis performance and memory efficiency.\n\nKEY FINDINGS:\n- 6 out of 11 columns are using suboptimal data types, all stored as generic \"object\" types instead of specialized categorical formats\n- All numeric data (Age, Salt Intake, Stress Score, Sleep Duration, BMI) is clean with no missing values or data quality issues\n- 3 columns contain simple yes/no data that can be converted to efficient boolean types\n- No mixed data types or corrupted entries detected - dataset is structurally sound\n\nRECOMMENDED OPTIMIZATIONS:\n1. Convert 5 categorical columns (BP History, Medication, Family History, Exercise Level, Smoking Status) from object to category type for better memory usage and analysis capabilities\n2. Convert 1 target column (Has Hypertension) to boolean for logical operations\n3. Keep numeric columns as-is - they are properly formatted\n\nBUSINESS IMPACT:\n- Improved memory efficiency for larger datasets\n- Faster analysis and modeling operations\n- Better data integrity for machine learning workflows\n- Enhanced categorical analysis capabilities for health risk factors\n\nNEXT STEPS:\nImplement the 6 recommended data type conversions to prepare the dataset for advanced analytics and predictive modeling. The clean data quality means conversions can proceed without additional data cleaning steps."
+          }
+        ];
+        console.log('🧪 TEST MODE: Using sample chat history');
+        
+        // Process test data directly
+        const messages: Message[] = [];
+        testChatHistory.forEach((item, index) => {
+          const baseId = Date.now() + index * 2;
+          const currentTime = new Date();
+          
+          messages.push({
+            id: `${baseId}`,
+            content: item.question,
+            role: 'user',
+            timestamp: new Date(currentTime.getTime() + index * 2).toISOString(),
+          });
+          
+          messages.push({
+            id: `${baseId + 1}`,
+            content: item.answer,
+            role: 'assistant',
+            timestamp: new Date(currentTime.getTime() + index * 2 + 1).toISOString(),
+          });
+        });
+        
+        setMessages(messages);
+        console.log(`✅ TEST MODE: Successfully loaded ${messages.length} messages`);
+        return;
+      }
+      
+      // Gateway handles all parameter extraction from token automatically
+      // Just need to ensure user is authenticated and has active session/file
+      const currentState = { 
+        hasSession: !!currentSession,
+        sessionTitle: currentSession?.title,
+        hasActiveFile: !!activeFile,
+        fileName: activeFile?.file_name,
+        isAuthenticated: !!localStorage.getItem('access_token')
+      };
+      console.log('📋 Current state:', currentState);
+
+      const response = await fetch(apiEndpoints.chatHistory, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
 
+      console.log('📡 Response status:', response.status, 'OK:', response.ok);
+      
       if (response.ok) {
         const chatHistory: ChatHistoryItem[] = await response.json();
-        console.log('📖 Chat history response received:', chatHistory);
+        console.log('📖 Raw chat history response:', JSON.stringify(chatHistory, null, 2));
         
         if (chatHistory && chatHistory.length > 0) {
-          // Convert chat history to messages format
+          // Convert chat history to dialog format: questions on RIGHT (user), answers on LEFT (assistant)
           const messages: Message[] = [];
           chatHistory.forEach((item, index) => {
             const baseId = Date.now() + index * 2;
+            const currentTime = new Date();
             
-            // Add user question
+            // Add user question (will appear on RIGHT side)
             messages.push({
               id: `${baseId}`,
               content: item.question,
               role: 'user',
-              timestamp: new Date().toISOString(),
+              timestamp: new Date(currentTime.getTime() + index * 2).toISOString(),
             });
             
-            // Add assistant answer
+            // Add assistant answer (will appear on LEFT side)
             messages.push({
               id: `${baseId + 1}`,
               content: item.answer,
               role: 'assistant',
-              timestamp: new Date().toISOString(),
+              timestamp: new Date(currentTime.getTime() + index * 2 + 1).toISOString(),
             });
           });
           
           setMessages(messages);
-          console.log(`✅ Successfully converted ${chatHistory.length} chat history items to ${messages.length} messages`);
-          console.log('💬 Previous conversations are now displayed to the user');
+          console.log(`✅ Successfully converted ${chatHistory.length} chat history items to ${messages.length} dialog messages`);
+          console.log('💬 Chat history recreated: Questions on RIGHT (user), Answers on LEFT (assistant)');
+          console.log(`📋 Sample format - Question: "${chatHistory[0].question.substring(0, 30)}..." Answer: "${chatHistory[0].answer.substring(0, 30)}..."`);
+          console.log(`📁 Chat history loaded for file: ${activeFileName}`);
         } else {
           console.log('📝 No previous conversation history found - showing empty chat (like new session)');
           setMessages([]);
         }
       } else {
-        console.log(`⚠️ Chat history service responded with status ${response.status}, showing empty chat`);
+        const errorText = await response.text().catch(() => 'No error details');
+        console.log(`⚠️ Chat history service responded with status ${response.status}`);
+        console.log(`📝 Error response body:`, errorText);
         setMessages([]);
       }
     } catch (error) {
       console.error('❌ Error loading chat history:', error);
+      console.log('🔧 Possible issues: 1) API gateway not running on port 8003, 2) Not authenticated, 3) No active session/file');
+      
+      // Try to provide helpful debugging info
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.log('🚨 Network error - API gateway may not be running on http://localhost:8003');
+      }
+      
       console.log('📝 Showing empty chat due to chat history service error');
       setMessages([]);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only call manually, access current values from closure
 
   // Load sessions from API
   const loadSessions = useCallback(async () => {
@@ -421,6 +496,11 @@ const ChatPage: React.FC = () => {
         // The active file state is already updated above for immediate visual feedback
         await loadFiles();
         await getActiveFile();
+        
+        // IMPORTANT: Load chat history for this file when it becomes active
+        console.log(`📂 File ${fileName} is now active - loading chat history`);
+        await loadChatHistory();
+        
         console.log(`Successfully set ${fileName} as active file for session ${currentSession.title}`);
       } else {
         console.error(`Failed to set active file, status: ${response.status}`);
@@ -429,6 +509,10 @@ const ChatPage: React.FC = () => {
         if (selectedFile) {
           setActiveFile(selectedFile);
           console.log(`Set active file locally despite API failure: ${fileName}`);
+          
+          // Load chat history even if API failed
+          console.log(`📂 File ${fileName} set locally - loading chat history`);
+          await loadChatHistory();
         }
       }
     } catch (error) {
@@ -438,6 +522,14 @@ const ChatPage: React.FC = () => {
       if (selectedFile) {
         setActiveFile(selectedFile);
         console.log(`Set active file locally due to network error: ${fileName}`);
+        
+        // Load chat history even on network error
+        try {
+          console.log(`📂 File ${fileName} set locally (network error) - loading chat history`);
+          await loadChatHistory();
+        } catch (historyError) {
+          console.error('Failed to load chat history after network error:', historyError);
+        }
       }
     } finally {
       setSettingActiveFile(null);

@@ -68,6 +68,9 @@ class ChatHistoryRepository:
         if chat_history_update.variables is not None:
             chat_history.variables = chat_history_update.variables
 
+        if chat_history_update.conversation is not None:
+            chat_history.conversation = chat_history_update.conversation
+
         db.commit()
 
     @classmethod

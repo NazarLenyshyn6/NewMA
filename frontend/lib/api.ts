@@ -1,5 +1,4 @@
 const API_BASE_URL = 'http://localhost:8003';
-const CHAT_HISTORY_BASE_URL = 'http://127.0.0.1:8005';
 
 export const apiEndpoints = {
   login: `${API_BASE_URL}/api/v1/gateway/auth/login`,
@@ -8,7 +7,7 @@ export const apiEndpoints = {
   sessions: `${API_BASE_URL}/api/v1/gateway/sessions`,
   chat: `${API_BASE_URL}/api/v1/gateway/chat`,
   chatSave: `${API_BASE_URL}/api/v1/gateway/chat/save`,
-  chatHistory: `${CHAT_HISTORY_BASE_URL}/api/v1/chat_history`,
+  chatHistory: `${API_BASE_URL}/api/v1/gateway/chat/history`,
 };
 
 export const getAuthHeaders = () => {
