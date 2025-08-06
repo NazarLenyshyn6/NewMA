@@ -27,6 +27,19 @@ planners = {
     EdaSubTasks.DATA_PROVENANCE_CHECK.name: eda_planners.data_provenance_check_solution_planner,
     EdaSubTasks.LOG_TRANSFORMATION_CHECK.name: eda_planners.log_transformation_check_solution_planner,
     EdaSubTasks.DATA_COMPLETENESS_CHECK.name: eda_planners.data_completeness_check_solution_planner,
+    ClassificationSubTasks.CATEGORICAL_ENCODING.name: classification_subtasks.categorical_encoding_solution_planner,
+    ClassificationSubTasks.FEATURE_SCALING.name: classification_subtasks.feature_scaling_solution_planner,
+    ClassificationSubTasks.FEATURE_SELECTION.name: classification_subtasks.feature_selection_solution_planner,
+    ClassificationSubTasks.DATA_SPLITTING.name: classification_subtasks.data_splitting_solution_planner,
+    ClassificationSubTasks.MODEL_SELECTION.name: classification_subtasks.model_selection_solution_planner,
+    ClassificationSubTasks.TRAINING.name: classification_subtasks.training_solution_planner,
+    ClassificationSubTasks.HYPERPARAMETER_TUNING.name: classification_subtasks.hyperparameter_tuning_solution_planner,
+    ClassificationSubTasks.MODEL_EVALUATION.name: classification_subtasks.model_evaluation_solution_planner,
+    ClassificationSubTasks.CROSS_VALIDATION.name: classification_subtasks.cross_validation_solution_planner,
+    ClassificationSubTasks.CONFUSION_MATRIX.name: classification_subtasks.confusion_matrix_solution_planner,
+    ClassificationSubTasks.FEATURE_IMPORTANCE.name: classification_subtasks.feature_importance_solution_planner,
+    ClassificationSubTasks.MODEL_EXPLANATION.name: classification_subtasks.model_explanation_solution_planner,
+    ClassificationSubTasks.MODEL_SERIALIZATION.name: classification_subtasks.model_serialization_solution_planner,
 }
 
 solution_planning_runner = SolutionPlanningRunner(

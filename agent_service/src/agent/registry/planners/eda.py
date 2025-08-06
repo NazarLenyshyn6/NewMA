@@ -87,14 +87,14 @@ missing_value_imputation_strategy_solution_planner = SolutionPlanner(
     model=anthropic_claude_sonnet_4_20250514_model,
     prompt=eda.missing_value_imputation_stragety_solution_planning_prompt,
     memory_manager=solution_planner_memory_manager,
-    dependencies=["pandas", "sklearn.impute", "numpy"],
+    dependencies=["pandas", "sklearn", "numpy"],
 )
 
 class_distribution_check_solution_planner = SolutionPlanner(
     model=anthropic_claude_sonnet_4_20250514_model,
     prompt=eda.class_distribution_check_solution_planning_prompt,
     memory_manager=solution_planner_memory_manager,
-    dependencies=["pandas", "matplotlib", "seaborn", "imbalanced-learn", "imblearn"],
+    dependencies=["pandas", "matplotlib", "seaborn", "imblearn"],
 )
 
 heatmaps_solution_planner = SolutionPlanner(
