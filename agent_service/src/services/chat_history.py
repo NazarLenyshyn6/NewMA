@@ -59,6 +59,24 @@ class ChatHistoryService:
             file_name=file_name,
         )
 
+    def get_conversation_history(
+        self,
+        db: Session,
+        user_id: int,
+        session_id: UUID,
+        file_name: str,
+        storage_uri: str,
+    ):
+        """..."""
+        chat_history = self.get_chat_history(
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+        )
+        return pickle.loads(chat_history.conversation)
+
     def create_chat_history(
         self,
         db: Session,
@@ -81,6 +99,7 @@ class ChatHistoryService:
             solutions=pickle.dumps(""),
             code=pickle.dumps(""),
             variables=pickle.dumps({"df": df}),
+            conversation=pickle.dumps([]),
         )
 
         # Persist the new chat history record into the database
@@ -93,7 +112,7 @@ class ChatHistoryService:
 
         return chat_history
 
-    def update_chat_history(
+    def save_chat_history(
         self,
         db: Session,
         user_id: int,
@@ -127,6 +146,7 @@ class ChatHistoryService:
         solutions_update: Optional[bytes] = None,
         code_update: Optional[bytes] = None,
         variables_update: Optional[bytes] = None,
+        conversation_update: Optional[bytes] = None,
     ):
         """..."""
         # Get current chat history
@@ -147,6 +167,9 @@ class ChatHistoryService:
 
         if variables_update is not None:
             chat_history.variables = variables_update
+
+        if conversation_update is not None:
+            chat_history.conversation = conversation_update
 
         # Cache updated chat history
         self.chat_history_cache.cache_chat_history(

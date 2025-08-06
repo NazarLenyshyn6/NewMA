@@ -40,6 +40,7 @@ from agent.reporters import generate_report
 from agent.registry.memory.planners import solution_planner_memory_manager
 from agent.registry.memory.code.variables import code_variables_memory_manager
 from agent.registry.memory.code.generator import code_generator_memory_manager
+from agent.registry.memory.conversation import conversation_memory_manager
 
 
 class AgentService(BaseModel):
@@ -64,6 +65,7 @@ class AgentService(BaseModel):
         dataset_summary: str,
     ):
         """..."""
+
         tasks = self.task_classification_runner.classify(question)
         print("Tasks:", tasks)
         subtasks = self.subtask_classification_runner.classify(question, tasks)
@@ -124,6 +126,7 @@ class AgentService(BaseModel):
         dataset_summary: str,
     ):
         # Step 1: Task Classification
+        conversation = []
         yield "🧠 Step 1: Task Classification\n"
         yield "🔍 Understanding your question...\n"
         tasks = self.task_classification_runner.classify(question)
@@ -225,10 +228,23 @@ class AgentService(BaseModel):
             report = "\n".join(formatted_analysis_report)
 
             async for chunk in generate_report(report):
+                conversation.append(chunk)
                 yield chunk
 
-            yield "\n💾 Updating Agent memory to reflect all plans, analysis insights, and generated code. This ensures consistency for future steps.\n"
+            yield "\n\n💾 Updating Agent memory to reflect all plans, analysis insights, and generated code. This ensures consistency for future steps.\n"
             # Save solution plan
+
+            conversation_memory = conversation_memory_manager.get_conversation_history(
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+            )
+            updated_conversation_memory = conversation_memory + [
+                {"question": question, "answer": "".join(conversation)}
+            ]
+
             solution_planner_memory_manager.update_solutions_history(
                 db=db,
                 user_id=user_id,
@@ -255,6 +271,15 @@ class AgentService(BaseModel):
                 storage_uri=storage_uri,
                 new_code=code,
             )
+            conversation_memory_manager.update_conversation_history(
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+                new_conversation=updated_conversation_memory,
+            )
+            print(updated_conversation_memory)
 
 
 agent_service = AgentService(

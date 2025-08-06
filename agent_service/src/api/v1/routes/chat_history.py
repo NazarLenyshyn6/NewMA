@@ -3,6 +3,7 @@
 from uuid import UUID
 
 
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends
 
@@ -11,17 +12,15 @@ from services.chat_history import chat_history_service
 
 router = APIRouter(prefix="/chat_history", tags=["ChatHistory"])
 
-from pydantic import BaseModel
 
-
-class ChatHistoryRead(BaseModel):
+class ChatHistorySave(BaseModel):
     user_id: int
     session_id: UUID
     file_name: str
 
 
-@router.get("/", response_model=ChatHistoryRead)
-def get_chat_history(
+@router.get("/")
+def get_conversation_history(
     user_id: int,
     session_id: UUID,
     file_name: str,
@@ -29,12 +28,25 @@ def get_chat_history(
     db: Session = Depends(db_manager.get_db),
 ):
     """..."""
-    return chat_history_service.get_chat_history(
+    return chat_history_service.get_conversation_history(
         db=db,
         user_id=user_id,
         session_id=session_id,
         file_name=file_name,
         storage_uri=storage_uri,
+    )
+
+
+@router.post("/")
+def save_chat_history(
+    chat_history_save: ChatHistorySave,
+    db: Session = Depends(db_manager.get_db),
+):
+    chat_history_service.save_chat_history(
+        db=db,
+        user_id=chat_history_save.user_id,
+        session_id=chat_history_save.session_id,
+        file_name=chat_history_save.file_name,
     )
 
 

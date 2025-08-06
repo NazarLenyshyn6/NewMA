@@ -16,3 +16,4 @@ class ChatHistory(BaseSchema):
     solutions: Optional[bytes]
     code: Optional[bytes]
     variables: Optional[bytes]
+    conversation: Optional[bytes]

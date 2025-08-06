@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info } from 'lucide-react';
+import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info, Save } from 'lucide-react';
 
 interface Session {
   id: string;
@@ -15,6 +15,11 @@ interface Message {
   content: string;
   role: 'user' | 'assistant';
   timestamp: string;
+}
+
+interface ChatHistoryItem {
+  question: string;
+  answer: string;
 }
 
 interface FileItem {
@@ -63,6 +68,8 @@ const ChatPage: React.FC = () => {
   const [showDatasetInfoTab, setShowDatasetInfoTab] = useState(false);
   const [selectedDatasetInfo, setSelectedDatasetInfo] = useState<FileItem | null>(null);
   const [loadingDatasetInfo, setLoadingDatasetInfo] = useState(false);
+  const [savingConversation, setSavingConversation] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -229,6 +236,60 @@ const ChatPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading messages:', error);
+      setMessages([]);
+    }
+  }, []);
+
+  // Load chat history from chat history service
+  const loadChatHistory = useCallback(async () => {
+    try {
+      console.log('🔍 TRIGGERING CHAT HISTORY ENDPOINT:', 'http://127.0.0.1:8005/api/v1/chat_history');
+      const response = await fetch('http://127.0.0.1:8005/api/v1/chat_history', {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        const chatHistory: ChatHistoryItem[] = await response.json();
+        console.log('📖 Chat history response received:', chatHistory);
+        
+        if (chatHistory && chatHistory.length > 0) {
+          // Convert chat history to messages format
+          const messages: Message[] = [];
+          chatHistory.forEach((item, index) => {
+            const baseId = Date.now() + index * 2;
+            
+            // Add user question
+            messages.push({
+              id: `${baseId}`,
+              content: item.question,
+              role: 'user',
+              timestamp: new Date().toISOString(),
+            });
+            
+            // Add assistant answer
+            messages.push({
+              id: `${baseId + 1}`,
+              content: item.answer,
+              role: 'assistant',
+              timestamp: new Date().toISOString(),
+            });
+          });
+          
+          setMessages(messages);
+          console.log(`✅ Successfully converted ${chatHistory.length} chat history items to ${messages.length} messages`);
+          console.log('💬 Previous conversations are now displayed to the user');
+        } else {
+          console.log('📝 No previous conversation history found - showing empty chat (like new session)');
+          setMessages([]);
+        }
+      } else {
+        console.log(`⚠️ Chat history service responded with status ${response.status}, showing empty chat`);
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error('❌ Error loading chat history:', error);
+      console.log('📝 Showing empty chat due to chat history service error');
       setMessages([]);
     }
   }, []);
@@ -472,6 +533,9 @@ const ChatPage: React.FC = () => {
             }),
           });
           
+          // Load chat history for the new session (will be empty for new sessions)
+          await loadChatHistory();
+          
           // After setting session as active, get the active file
           await getActiveFile();
         } catch (error) {
@@ -494,7 +558,7 @@ const ChatPage: React.FC = () => {
     if (currentSession?.id === session.id) return;
 
     try {
-      console.log(`Switching to session: ${session.title}`);
+      console.log(`🔄 User clicked to switch to session: ${session.title}`);
       const response = await fetch(`http://localhost:8003/api/v1/gateway/sessions/active/${session.title}`, {
         method: 'POST',
         headers: getAuthHeaders(),
@@ -504,28 +568,39 @@ const ChatPage: React.FC = () => {
       });
 
       if (response.ok) {
-        console.log(`Successfully set session ${session.title} as active`);
+        console.log(`✅ Successfully set session ${session.title} as active`);
         
         // Set the current session first
         setCurrentSession(session);
         
-        // Load session data
-        loadMessages(session.id);
+        // ALWAYS load chat history when switching sessions - this is the key functionality
+        console.log(`📚 Loading chat history for session: ${session.title}`);
+        await loadChatHistory();
+        
+        // Load other session data
         loadFiles();
         
         // Store session info
         localStorage.setItem('activeSessionId', session.id);
         localStorage.setItem('activeSessionTitle', session.title);
         
-        // Now get the active file for this session - this will update sessionActiveFiles
+        // Now get the active file for this session
         await getActiveFile();
         
-        console.log(`Session switch complete for: ${session.title}`);
+        console.log(`🎉 Session switch complete for: ${session.title} - Chat history loaded`);
       } else {
-        console.error('Failed to set session as active on backend');
+        console.error('❌ Failed to set session as active on backend');
+        // Even if backend fails, still try to load chat history for better UX
+        setCurrentSession(session);
+        console.log(`📚 Loading chat history despite backend error for session: ${session.title}`);
+        await loadChatHistory();
       }
     } catch (error) {
-      console.error('Error switching session:', error);
+      console.error('❌ Error switching session:', error);
+      // Fallback: still try to show the session with chat history
+      setCurrentSession(session);
+      console.log(`📚 Loading chat history in fallback mode for session: ${session.title}`);
+      await loadChatHistory();
     }
   };
 
@@ -626,6 +701,44 @@ const ChatPage: React.FC = () => {
       console.error('Error getting dataset info:', error);
     } finally {
       setLoadingDatasetInfo(false);
+    }
+  };
+
+  // Save conversation
+  const saveConversation = async () => {
+    if (!currentSession || messages.length === 0) {
+      setSaveMessage('No conversation to save');
+      setTimeout(() => setSaveMessage(''), 3000);
+      return;
+    }
+
+    if (isLoading) {
+      setSaveMessage('Please wait for the response to complete before saving');
+      setTimeout(() => setSaveMessage(''), 3000);
+      return;
+    }
+
+    setSavingConversation(true);
+    setSaveMessage('');
+
+    try {
+      const response = await fetch('http://localhost:8003/api/v1/gateway/chat/save', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        setSaveMessage('Conversation saved successfully!');
+        setTimeout(() => setSaveMessage(''), 3000);
+      } else {
+        throw new Error('Failed to save conversation');
+      }
+    } catch (error) {
+      console.error('Error saving conversation:', error);
+      setSaveMessage('Failed to save conversation. Please try again.');
+      setTimeout(() => setSaveMessage(''), 5000);
+    } finally {
+      setSavingConversation(false);
     }
   };
 
@@ -830,7 +943,9 @@ const ChatPage: React.FC = () => {
       if (savedSession) {
         console.log(`Restoring active session: ${savedSession.title}`);
         setCurrentSession(savedSession);
-        loadMessages(savedSession.id);
+        
+        // Load chat history for the restored session
+        await loadChatHistory();
         
         // Ensure we get the active file for this restored session
         await getActiveFile();
@@ -841,7 +956,7 @@ const ChatPage: React.FC = () => {
         localStorage.removeItem('activeSessionTitle');
       }
     }
-  }, [sessions, loadMessages, getActiveFile]);
+  }, [sessions, loadChatHistory, getActiveFile]);
 
   // Check if user is authenticated and initialize
   useEffect(() => {
@@ -1056,6 +1171,47 @@ const ChatPage: React.FC = () => {
           </div>
           
           <div className="flex items-center space-x-3">
+            {/* Save Conversation Button */}
+            {currentSession && messages.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={saveConversation}
+                  disabled={savingConversation || isLoading}
+                  className={`flex items-center space-x-2 px-4 py-3 rounded-2xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-105 font-semibold ${
+                    savingConversation || isLoading
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-green-500/30 hover:shadow-green-500/50'
+                  }`}
+                  title={isLoading ? "Please wait for the response to complete" : "Save conversation"}
+                >
+                  {savingConversation ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : isLoading ? (
+                    <>
+                      <Save className="w-5 h-5" />
+                      <span>Wait...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-5 h-5" />
+                      <span>Save</span>
+                    </>
+                  )}
+                </button>
+                {saveMessage && (
+                  <div className={`absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 text-sm rounded-lg shadow-lg z-50 whitespace-nowrap ${
+                    saveMessage.includes('success') 
+                      ? 'bg-green-100 text-green-800 border border-green-200'
+                      : 'bg-red-100 text-red-800 border border-red-200'
+                  }`}>
+                    {saveMessage}
+                  </div>
+                )}
+              </div>
+            )}
             <button
               onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
               className={`p-3 rounded-2xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-105 ${
@@ -1274,6 +1430,17 @@ const ChatPage: React.FC = () => {
                     )}
                   </button>
                 </div>
+                
+                {/* Save Message */}
+                {saveMessage && (
+                  <div className={`mt-3 text-center text-sm font-medium px-4 py-2 rounded-xl shadow-md ${
+                    saveMessage.includes('success') 
+                      ? 'bg-green-100 text-green-800 border border-green-200'
+                      : 'bg-red-100 text-red-800 border border-red-200'
+                  }`}>
+                    {saveMessage}
+                  </div>
+                )}
                 
                 {/* Helper text */}
                 <div className="flex items-center justify-center space-x-4 mt-3 text-xs text-slate-500">

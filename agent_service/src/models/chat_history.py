@@ -21,3 +21,4 @@ class ChatHistory(Base):
     solutions: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     code: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     variables: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    conversation: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
