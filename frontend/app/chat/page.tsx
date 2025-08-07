@@ -1464,12 +1464,12 @@ const ChatPage: React.FC = () => {
                     </div>
                   )}
                   
-                  {/* AI response - aligned left */}
+                  {/* AI response - floating with light borders */}
                   {message.role === 'assistant' && (
-                    <div className="flex justify-start mb-6">
+                    <div className="flex justify-start mb-8">
                       <div className="max-w-4xl w-full">
-                        <div className="bg-white rounded-2xl px-5 py-4 shadow-medium hover:shadow-strong transition-all duration-200 border border-gray-200">
-                          <div className="text-base leading-[1.7] text-gray-800 font-normal">
+                        <div className="px-6 py-3">
+                          <div className="text-base leading-[1.7] text-gray-800 font-normal text-left">
                             {message.content ? (
                               <>
                                 {renderMessageContent(message.content, message.id)}
@@ -1480,7 +1480,7 @@ const ChatPage: React.FC = () => {
                               </>
                             ) : (
                               /* Loading state for empty assistant message */
-                              <div className="flex items-center gap-4 text-gray-600">
+                              <div className="flex items-center justify-center gap-4 text-gray-600">
                                 <div className="flex gap-1">
                                   <div className="w-2.5 h-2.5 bg-primary-400 rounded-full animate-bounce"></div>
                                   <div className="w-2.5 h-2.5 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -1491,7 +1491,11 @@ const ChatPage: React.FC = () => {
                             )}
                           </div>
                         </div>
-                        <div className="text-xs text-gray-500 mt-2 ml-1 font-medium">
+                        
+                        {/* Bottom border - more visible */}
+                        <div className="h-0.5 bg-gradient-to-r from-transparent via-blue-400/80 to-transparent mt-4 mb-2"></div>
+                        
+                        <div className="text-xs text-gray-400 text-left font-medium ml-6">
                           {new Date(message.timestamp).toLocaleTimeString('en-US', {
                             hour: '2-digit',
                             minute: '2-digit'
@@ -1520,7 +1524,7 @@ const ChatPage: React.FC = () => {
         {currentSession && (
           <div className="w-full px-6 py-6">
             <div className="flex justify-center">
-              <div className="w-1/2">
+              <div className="w-2/5 max-w-3xl">
                 <div className={`bg-gradient-to-br from-white via-slate-50 to-gray-50 rounded-2xl border-2 transition-all duration-300 overflow-hidden ${
                   inputMessage.trim() 
                     ? 'border-primary-300 shadow-medium shadow-primary-100/50 hover:shadow-strong hover:shadow-primary-200/60' 
