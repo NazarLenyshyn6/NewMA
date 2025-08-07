@@ -13,8 +13,6 @@ class SubtasksClassifier(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     model: Runnable
     prompt: ChatPromptTemplate
     subtasks: List
