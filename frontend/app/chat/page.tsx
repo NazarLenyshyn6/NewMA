@@ -337,12 +337,13 @@ const ChatPage: React.FC = () => {
         continue;
       }
 
-      // Check for table rows (| col1 | col2 | col3 |)
-      const tableMatch = trimmedLine.match(/^\|(.+)\|$/);
-      if (tableMatch) {
-        // Look ahead to find the complete table
+      // Check for table rows (| col1 | col2 | col3 |) - must have at least 2 columns
+      const tableMatch = trimmedLine.match(/^\|(.+\|.+)\|$/);
+      if (tableMatch && tableMatch[1].includes('|')) {
+        // Look ahead to find the complete table - must have at least 2 rows
         const tableRows = [];
         let tableIndex = i;
+        let separatorFound = false;
         
         // Collect all consecutive table rows
         while (tableIndex < lines.length) {
@@ -350,10 +351,18 @@ const ChatPage: React.FC = () => {
           const tableRowMatch = tableLine.match(/^\|(.+)\|$/);
           
           if (tableRowMatch) {
-            // Skip separator rows (|---|---|---|)
-            if (!tableLine.match(/^\|[\s\-\|:]+\|$/)) {
+            // Check if this is a separator row (|---|---|---|)
+            if (tableLine.match(/^\|[\s\-\|:]+\|$/)) {
+              separatorFound = true;
+            } else {
+              // Ensure it has the right number of columns (at least 2)
               const cells = tableRowMatch[1].split('|').map(cell => cell.trim());
-              tableRows.push(cells);
+              if (cells.length >= 2) {
+                tableRows.push(cells);
+              } else {
+                // Not a valid table row, break
+                break;
+              }
             }
             tableIndex++;
           } else {
@@ -361,8 +370,8 @@ const ChatPage: React.FC = () => {
           }
         }
         
-        // Render the table if we found rows
-        if (tableRows.length > 0) {
+        // Only render as table if we have multiple rows and proper structure
+        if (tableRows.length >= 2) {
           const [headerRow, ...dataRows] = tableRows;
           
           elements.push(
@@ -395,6 +404,9 @@ const ChatPage: React.FC = () => {
           // Skip the processed table rows
           i = tableIndex - 1;
           continue;
+        } else {
+          // Not a valid table, treat as regular text
+          // Fall through to regular paragraph handling
         }
       }
 
