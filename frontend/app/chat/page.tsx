@@ -1526,9 +1526,9 @@ const ChatPage: React.FC = () => {
                     ? 'border-primary-300 shadow-medium shadow-primary-100/50 hover:shadow-strong hover:shadow-primary-200/60' 
                     : 'border-slate-200 shadow-md hover:border-slate-300 hover:shadow-lg'
                 }`}>
-                  <div className="flex items-stretch">
+                  <div className="flex items-center">
                     {/* Upload Dataset Button - Left Side */}
-                    <div className="flex items-end p-3">
+                    <div className="flex items-center pl-3 pr-2">
                       <button
                         onClick={() => setShowUploadModal(true)}
                         className="group relative overflow-hidden rounded-xl transition-all duration-300 bg-gradient-to-br from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-600/40 hover:scale-110 active:scale-95 p-3 flex items-center justify-center"
@@ -1560,12 +1560,12 @@ const ChatPage: React.FC = () => {
                           }
                         }}
                         placeholder={`Ask ML Agent${activeFile ? ` about ${activeFile.file_name}` : ' anything about your data'}...`}
-                        className="w-full bg-transparent border-none resize-none focus:outline-none text-gray-800 placeholder-gray-500 text-base leading-[1.6] font-medium px-4 py-5 min-h-[60px] max-h-[140px] transition-all duration-200"
-                        rows={2}
+                        className="w-full bg-transparent border-none resize-none focus:outline-none text-gray-800 placeholder-gray-500 text-base leading-[1.5] font-medium pl-1 pr-2 py-4 min-h-[56px] max-h-[120px] transition-all duration-200 text-left"
+                        rows={1}
                         onInput={(e) => {
                           const target = e.target as HTMLTextAreaElement;
                           target.style.height = 'auto';
-                          const newHeight = Math.min(Math.max(target.scrollHeight, 60), 140);
+                          const newHeight = Math.min(Math.max(target.scrollHeight, 56), 120);
                           target.style.height = newHeight + 'px';
                         }}
                         disabled={isLoading}
@@ -1578,7 +1578,7 @@ const ChatPage: React.FC = () => {
                     </div>
                     
                     {/* Enhanced send button with better positioning */}
-                    <div className="flex items-end p-4">
+                    <div className="flex items-center pl-2 pr-3">
                       {/* Send Message Button */}
                       <button
                         onClick={sendMessage}
@@ -1587,7 +1587,7 @@ const ChatPage: React.FC = () => {
                           inputMessage.trim() && !isLoading
                             ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 hover:from-blue-600 hover:via-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-600/40 hover:scale-105 active:scale-95'
                             : 'bg-gradient-to-br from-gray-200 to-gray-300 text-gray-500 cursor-not-allowed shadow-sm'
-                        } p-3.5 min-w-[52px] min-h-[52px] flex items-center justify-center`}
+                        } p-3 min-w-[48px] min-h-[48px] flex items-center justify-center`}
                       >
                         {/* Button background animation */}
                         {inputMessage.trim() && !isLoading && (
