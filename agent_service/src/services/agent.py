@@ -134,12 +134,14 @@ class AgentService(BaseModel):
         yield "🧠 Step 1: Task Classification\n"
         yield "🔍 Understanding your question and intent...\n\n"
         tasks = self.task_classification_runner.classify(question)
+        print(tasks)
         yield "✅  \n\n"
 
         # Step 2: Subtask Classification
         yield "🪜 Step 2: Subtask Classification\n"
         yield "🔧 Decomposing the problem into actionable subtasks...\n\n"
         subtasks = self.subtask_classification_runner.classify(question, tasks)
+        print(subtasks)
         yield "✅ \n\n"
 
         # Step 3: Solution Planning
@@ -315,7 +317,6 @@ class AgentService(BaseModel):
                 storage_uri=storage_uri,
                 dataset_summary=dataset_summary,
             ):
-                conversation.append(chunk)
                 yield chunk
 
         elif flow == "EXPLAIN":

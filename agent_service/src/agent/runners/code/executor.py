@@ -52,7 +52,6 @@ class CodeExecutionRunner(BaseModel):
             file_name=file_name,
             storage_uri=storage_uri,
         )
-
         global_context = dependencies.copy()
         local_context = variables.copy()
         global_context.update(local_context)
@@ -65,10 +64,13 @@ class CodeExecutionRunner(BaseModel):
                 for k, v in global_context.items()
                 if k not in dependencies and not isinstance(v, ModuleType)
             }
+            print(local_context.keys())
             yield local_context
 
         except Exception as e:
             yield "✅"
+            print(e)
+            print(variables.keys())
             code_fixing_message = []
             async for chunk in self.code_debagger.debug(code, str(e), dependencies):
                 code_fixing_message.append(chunk)
