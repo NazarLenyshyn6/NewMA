@@ -337,6 +337,67 @@ const ChatPage: React.FC = () => {
         continue;
       }
 
+      // Check for table rows (| col1 | col2 | col3 |)
+      const tableMatch = trimmedLine.match(/^\|(.+)\|$/);
+      if (tableMatch) {
+        // Look ahead to find the complete table
+        const tableRows = [];
+        let tableIndex = i;
+        
+        // Collect all consecutive table rows
+        while (tableIndex < lines.length) {
+          const tableLine = lines[tableIndex].replace(/^\s+/, '').replace(/\s+$/, '');
+          const tableRowMatch = tableLine.match(/^\|(.+)\|$/);
+          
+          if (tableRowMatch) {
+            // Skip separator rows (|---|---|---|)
+            if (!tableLine.match(/^\|[\s\-\|:]+\|$/)) {
+              const cells = tableRowMatch[1].split('|').map(cell => cell.trim());
+              tableRows.push(cells);
+            }
+            tableIndex++;
+          } else {
+            break;
+          }
+        }
+        
+        // Render the table if we found rows
+        if (tableRows.length > 0) {
+          const [headerRow, ...dataRows] = tableRows;
+          
+          elements.push(
+            <div key={currentIndex++} className="my-6 overflow-x-auto">
+              <table className="min-w-full bg-white border border-gray-200 rounded-lg shadow-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {headerRow.map((header, idx) => (
+                      <th key={idx} className="px-4 py-3 text-left text-sm font-semibold text-gray-900 border-b border-gray-200">
+                        {parseInlineFormatting(header)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {dataRows.map((row, rowIdx) => (
+                    <tr key={rowIdx} className={`${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-25'} hover:bg-blue-50 transition-colors duration-150`}>
+                      {row.map((cell, cellIdx) => (
+                        <td key={cellIdx} className="px-4 py-3 text-sm text-gray-800 border-b border-gray-100">
+                          {parseInlineFormatting(cell)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+          
+          // Skip the processed table rows
+          i = tableIndex - 1;
+          continue;
+        }
+      }
+
       // Regular paragraph
       elements.push(
         <div key={currentIndex++} className="mb-3 leading-relaxed">

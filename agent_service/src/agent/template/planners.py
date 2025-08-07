@@ -10,6 +10,42 @@ from langchain.prompts import (
 class SolutionPlanningPromptTemplate:
     """..."""
 
+    # @staticmethod
+    # def build(system_prompt: str) -> ChatPromptTemplate:
+    #     return ChatPromptTemplate.from_messages(
+    #         [
+    #             SystemMessagePromptTemplate.from_template(
+    #                 system_prompt + "\n\n"
+    #                 "You are a senior ML assistant providing an immediate, **one-shot**, highly efficient and detailed solution.\n"
+    #                 "Your output must be a **direct, executable, single-step answer** based on the current question and historical context.\n"
+    #                 "Do NOT produce any planning, frameworks, or future steps.\n"
+    #                 "Do NOT include abstractions, options, or alternative approaches.\n"
+    #                 "Focus solely on delivering a **complete, concrete solution** that can be implemented as-is.\n\n"
+    #                 "## Markdown formatting rules (STRICT):\n"
+    #                 "1. Use proper headings with blank lines before and after (avoid # syntax due to UI issues).\n"
+    #                 "2. Use either '-' or '*' for bullets consistently.\n"
+    #                 "3. Numbered lists must use '1.', '2.', etc. with a space after the period.\n"
+    #                 "4. NO inline code (`code`), NO code blocks, NO escape sequences.\n"
+    #                 "5. Leave exactly one blank line between sections and paragraphs.\n"
+    #                 "6. Use clear, concise natural language with meaningful line breaks for readability.\n\n"
+    #                 "**Your response will be rendered directly in a markdown UI and must not break formatting.**"
+    #             ),
+    #             HumanMessagePromptTemplate.from_template(
+    #                 "### Context\n\n"
+    #                 "{history}\n\n"
+    #                 "Carefully understand the prior summaries, findings, and decisions.\n"
+    #                 "Do NOT repeat or contradict history; build directly on it.\n"
+    #                 "Use the context only to inform a **single-step, optimal solution**.\n"
+    #             ),
+    #             HumanMessagePromptTemplate.from_template(
+    #                 "### User Question\n\n"
+    #                 "{question}\n\n"
+    #                 "Based on the above context and question, generate a **one-shot, direct, detailed solution**.\n"
+    #                 "This must be a fully formed answer, not a plan or outline."
+    #             ),
+    #         ]
+    #     )
+
     @staticmethod
     def build(system_prompt: str) -> ChatPromptTemplate:
         return ChatPromptTemplate.from_messages(
@@ -59,15 +95,3 @@ class SolutionPlanningPromptTemplate:
                 ),
             ]
         )
-
-
-# Example Output (From the Agent):
-# Step-by-step plan to address the question:
-# Review the structure of the dataset to understand feature types and target variable.
-# Identify missing values and decide on a suitable strategy to handle them.
-# Perform exploratory data analysis (EDA) to uncover patterns, correlations, and outliers.
-# Choose relevant features based on the problem type and data characteristics.
-# Select appropriate modeling techniques considering the target variable and dataset size.
-# Define an evaluation strategy (e.g., cross-validation, metrics) suitable for the problem.
-# Analyze results and iterate if necessary to improve model performance.
-# Summarize findings and next steps for the user.

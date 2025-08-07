@@ -62,7 +62,9 @@ class CodeExecutionRunner(BaseModel):
             local_context = {
                 k: v
                 for k, v in global_context.items()
-                if k not in dependencies and not isinstance(v, ModuleType)
+                if k not in dependencies
+                and not isinstance(v, ModuleType)
+                and not k == "log_step"
             }
             print(local_context.keys())
             yield local_context
