@@ -1449,7 +1449,7 @@ const ChatPage: React.FC = () => {
                   {message.role === 'user' && (
                     <div className="flex justify-end mb-6">
                       <div className="max-w-2xl">
-                        <div className="bg-primary-600 text-white rounded-2xl px-5 py-3.5 shadow-medium hover:shadow-strong transition-all duration-200">
+                        <div className="bg-white text-gray-800 rounded-2xl px-5 py-3.5 shadow-medium hover:shadow-strong transition-all duration-200 border border-gray-200">
                           <div className="text-base leading-relaxed font-medium">
                             {renderMessageContent(message.content, message.id)}
                           </div>
@@ -1518,15 +1518,36 @@ const ChatPage: React.FC = () => {
 
         {/* Input Area - Enhanced and optimized */}
         {currentSession && (
-          <div className="max-w-4xl mx-auto px-6 py-6">
-            <div className="flex justify-start">
-              <div className="max-w-4xl w-full">
+          <div className="w-full px-6 py-6">
+            <div className="flex justify-center">
+              <div className="w-1/2">
                 <div className={`bg-gradient-to-br from-white via-slate-50 to-gray-50 rounded-2xl border-2 transition-all duration-300 overflow-hidden ${
                   inputMessage.trim() 
                     ? 'border-primary-300 shadow-medium shadow-primary-100/50 hover:shadow-strong hover:shadow-primary-200/60' 
                     : 'border-slate-200 shadow-md hover:border-slate-300 hover:shadow-lg'
                 }`}>
                   <div className="flex items-stretch">
+                    {/* Upload Dataset Button - Left Side */}
+                    <div className="flex items-end p-3">
+                      <button
+                        onClick={() => setShowUploadModal(true)}
+                        className="group relative overflow-hidden rounded-xl transition-all duration-300 bg-gradient-to-br from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-600/40 hover:scale-110 active:scale-95 p-3 flex items-center justify-center"
+                        title="Upload Dataset"
+                      >
+                        {/* Animated background gradient */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                        
+                        {/* Enhanced icon with pulse effect */}
+                        <div className="relative z-10 flex items-center justify-center">
+                          <div className="absolute inset-0 bg-white/20 rounded-lg blur-sm group-hover:blur-md transition-all duration-300"></div>
+                          <PaperclipIcon className="w-5 h-5 relative transform transition-all duration-300 group-hover:rotate-12 group-hover:scale-110" />
+                        </div>
+                        
+                        {/* Subtle pulse ring */}
+                        <div className="absolute inset-0 rounded-xl ring-2 ring-white/0 group-hover:ring-white/30 transition-all duration-300"></div>
+                      </button>
+                    </div>
+
                     <div className="flex-1 relative">
                       {/* Enhanced textarea with better positioning */}
                       <textarea
@@ -1539,7 +1560,7 @@ const ChatPage: React.FC = () => {
                           }
                         }}
                         placeholder={`Ask ML Agent${activeFile ? ` about ${activeFile.file_name}` : ' anything about your data'}...`}
-                        className="w-full bg-transparent border-none resize-none focus:outline-none text-gray-800 placeholder-gray-500 text-base leading-[1.6] font-medium px-6 py-5 min-h-[60px] max-h-[140px] transition-all duration-200"
+                        className="w-full bg-transparent border-none resize-none focus:outline-none text-gray-800 placeholder-gray-500 text-base leading-[1.6] font-medium px-4 py-5 min-h-[60px] max-h-[140px] transition-all duration-200"
                         rows={2}
                         onInput={(e) => {
                           const target = e.target as HTMLTextAreaElement;
@@ -1556,8 +1577,9 @@ const ChatPage: React.FC = () => {
                       }`}></div>
                     </div>
                     
-                    {/* Enhanced button with better positioning */}
+                    {/* Enhanced send button with better positioning */}
                     <div className="flex items-end p-4">
+                      {/* Send Message Button */}
                       <button
                         onClick={sendMessage}
                         disabled={!inputMessage.trim() || isLoading}
