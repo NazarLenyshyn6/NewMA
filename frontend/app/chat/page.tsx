@@ -170,47 +170,315 @@ const ChatPage: React.FC = () => {
     return parts.length > 0 ? parts : [{ type: 'text', content }];
   };
 
+  // Parse streaming content with immediate code block formatting
+  const parseStreamingContent = (content: string) => {
+    // Apply same normalization as regular parsing
+    const normalizedContent = content
+      .replace(/\u00A0/g, ' ')  // Remove non-breaking spaces
+      .replace(/\r\n/g, '\n')   // Normalize newlines
+      .replace(/\r/g, '\n');    // Handle old Mac newlines
+      
+    const parts = [];
+    let currentIndex = 0;
+    
+    // Look for code block starts (```python, ```javascript, etc.)
+    const codeStartRegex = /```(\w+)?/g;
+    let match;
+    
+    while ((match = codeStartRegex.exec(normalizedContent)) !== null) {
+      // Add text before code block
+      if (match.index > currentIndex) {
+        parts.push({
+          type: 'text',
+          content: normalizedContent.slice(currentIndex, match.index)
+        });
+      }
+      
+      // Find the end of this code block or end of content
+      const codeStart = match.index;
+      const language = match[1] || 'text';
+      const codeContentStart = match.index + match[0].length;
+      
+      // Look for closing ```
+      const remainingContent = normalizedContent.slice(codeContentStart);
+      const codeEndMatch = remainingContent.match(/^[\s\S]*?```/);
+      
+      if (codeEndMatch) {
+        // Complete code block found
+        const codeContent = remainingContent.slice(0, codeEndMatch[0].length - 3).replace(/^\n/, '');
+        parts.push({
+          type: 'code',
+          language: language,
+          content: codeContent
+        });
+        currentIndex = codeStart + match[0].length + codeEndMatch[0].length;
+      } else {
+        // Incomplete code block (still streaming)
+        const codeContent = remainingContent.replace(/^\n/, '');
+        parts.push({
+          type: 'streaming-code',
+          language: language,
+          content: codeContent
+        });
+        currentIndex = normalizedContent.length;
+        break;
+      }
+    }
+    
+    // Add remaining text
+    if (currentIndex < normalizedContent.length) {
+      const remainingText = normalizedContent.slice(currentIndex);
+      // Check if the remaining text is just starting a code block
+      if (remainingText.match(/^```\w*$/)) {
+        parts.push({
+          type: 'text',
+          content: remainingText
+        });
+      } else {
+        parts.push({
+          type: 'text',
+          content: remainingText
+        });
+      }
+    }
+    
+    return parts.length > 0 ? parts : [{ type: 'text', content }];
+  };
+
+  // Render markdown text with proper formatting
+  const renderMarkdownText = (text: string) => {
+    // Normalize input text - fix whitespace and newline issues
+    let normalizedText = text
+      .replace(/\u00A0/g, ' ')  // Remove non-breaking spaces
+      .replace(/\r\n/g, '\n')   // Normalize newlines
+      .replace(/\r/g, '\n');    // Handle old Mac newlines
+    
+    // Split text into lines for processing
+    const lines = normalizedText.split('\n');
+    const elements = [];
+    let currentIndex = 0;
+
+    // Debug logging for headers
+    const headings = normalizedText.match(/^##\s.+$/gm);
+    if (headings) {
+      console.log('Parsed headings:', headings);
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // More aggressive whitespace normalization for headers
+      const trimmedLine = line.replace(/^\s+/, '').replace(/\s+$/, '');
+
+      if (trimmedLine === '') {
+        // Empty line - add spacing
+        elements.push(<div key={currentIndex++} className="h-3"></div>);
+        continue;
+      }
+
+      // Check for headers (## Header, ### Header, etc.) - enhanced regex
+      const headerMatch = trimmedLine.match(/^(#{1,6})\s*(.+)$/);
+      if (headerMatch) {
+        const level = headerMatch[1].length;
+        const headerText = headerMatch[2].trim(); // Additional trim for header text
+        const HeaderTag = `h${Math.min(level + 1, 6)}` as keyof JSX.IntrinsicElements;
+        
+        // Debug logging for specific header
+        if (headerText.toLowerCase().includes('outlier')) {
+          console.log('Found outlier header:', { 
+            original: line, 
+            trimmed: trimmedLine, 
+            level, 
+            headerText,
+            match: headerMatch 
+          });
+        }
+        
+        const headerClasses = {
+          1: 'text-2xl font-bold text-gray-900 mt-6 mb-4',
+          2: 'text-xl font-bold text-gray-900 mt-5 mb-3',
+          3: 'text-lg font-semibold text-gray-900 mt-4 mb-3',
+          4: 'text-base font-semibold text-gray-900 mt-4 mb-2',
+          5: 'text-sm font-semibold text-gray-900 mt-3 mb-2',
+          6: 'text-sm font-medium text-gray-900 mt-3 mb-2'
+        };
+
+        elements.push(
+          <HeaderTag key={currentIndex++} className={headerClasses[Math.min(level, 6) as keyof typeof headerClasses]}>
+            {parseInlineFormatting(headerText)}
+          </HeaderTag>
+        );
+        continue;
+      }
+
+      // Check for bullet points
+      const bulletMatch = trimmedLine.match(/^[-*+]\s+(.+)$/);
+      if (bulletMatch) {
+        const bulletText = bulletMatch[1];
+        elements.push(
+          <div key={currentIndex++} className="flex items-start ml-4 mb-2">
+            <span className="text-blue-500 mr-3 mt-1 flex-shrink-0">•</span>
+            <span className="text-gray-800 leading-relaxed">{parseInlineFormatting(bulletText)}</span>
+          </div>
+        );
+        continue;
+      }
+
+      // Check for numbered lists
+      const numberedMatch = trimmedLine.match(/^(\d+)\.\s+(.+)$/);
+      if (numberedMatch) {
+        const number = numberedMatch[1];
+        const listText = numberedMatch[2];
+        elements.push(
+          <div key={currentIndex++} className="flex items-start ml-4 mb-2">
+            <span className="text-blue-500 mr-3 mt-1 flex-shrink-0 font-medium">{number}.</span>
+            <span className="text-gray-800 leading-relaxed">{parseInlineFormatting(listText)}</span>
+          </div>
+        );
+        continue;
+      }
+
+      // Regular paragraph
+      elements.push(
+        <div key={currentIndex++} className="mb-3 leading-relaxed">
+          {parseInlineFormatting(trimmedLine)}
+        </div>
+      );
+    }
+
+    return <div>{elements}</div>;
+  };
+
+  // Parse inline formatting (**bold**, *italic*, etc.)
+  const parseInlineFormatting = (text: string): React.ReactNode => {
+    const parts = [];
+    let currentPos = 0;
+    
+    // Bold text (**text**)
+    const boldRegex = /\*\*([^*]+)\*\*/g;
+    let match;
+    
+    // Reset regex
+    boldRegex.lastIndex = 0;
+    
+    while ((match = boldRegex.exec(text)) !== null) {
+      // Add text before bold
+      if (match.index > currentPos) {
+        parts.push(text.slice(currentPos, match.index));
+      }
+      
+      // Add bold text
+      parts.push(
+        <strong key={`bold-${match.index}`} className="font-semibold text-gray-900">
+          {match[1]}
+        </strong>
+      );
+      
+      currentPos = match.index + match[0].length;
+    }
+    
+    // Add remaining text
+    if (currentPos < text.length) {
+      parts.push(text.slice(currentPos));
+    }
+    
+    // Process italic text (*text*) in the remaining parts
+    const processedParts = [];
+    for (let i = 0; i < parts.length; i++) {
+      if (typeof parts[i] === 'string') {
+        const italicRegex = /\*([^*]+)\*/g;
+        const textPart = parts[i] as string;
+        let lastPos = 0;
+        let italicMatch;
+        
+        italicRegex.lastIndex = 0;
+        
+        while ((italicMatch = italicRegex.exec(textPart)) !== null) {
+          // Add text before italic
+          if (italicMatch.index > lastPos) {
+            processedParts.push(textPart.slice(lastPos, italicMatch.index));
+          }
+          
+          // Add italic text
+          processedParts.push(
+            <em key={`italic-${i}-${italicMatch.index}`} className="italic text-gray-800">
+              {italicMatch[1]}
+            </em>
+          );
+          
+          lastPos = italicMatch.index + italicMatch[0].length;
+        }
+        
+        // Add remaining text from this part
+        if (lastPos < textPart.length) {
+          processedParts.push(textPart.slice(lastPos));
+        }
+      } else {
+        processedParts.push(parts[i]);
+      }
+    }
+    
+    return processedParts.length > 0 ? processedParts : text;
+  };
+
   // Render message content with code highlighting
-  const renderMessageContent = (content: string, messageId: string) => {
-    const parts = parseMessageContent(content);
+  const renderMessageContent = (content: string, messageId: string, isStreaming = false) => {
+    const parts = isStreaming ? parseStreamingContent(content) : parseMessageContent(content);
     
     return (
       <div className="prose max-w-none">
         {parts.map((part, index) => {
-          if (part.type === 'code') {
+          if (part.type === 'code' || part.type === 'streaming-code') {
             const codeId = `${messageId}-${index}`;
+            const isStreamingCode = part.type === 'streaming-code';
+            
             return (
               <div key={index} className="my-3 first:mt-0 last:mb-0">
-                <div className="bg-gray-800 rounded-t-2xl px-4 py-2.5 flex items-center justify-between border border-gray-700 shadow-soft">
-                  <span className="text-gray-300 text-sm font-mono font-medium">{part.language}</span>
-                  <button
-                    onClick={() => copyToClipboard(part.content, codeId)}
-                    className="flex items-center space-x-2 px-3 py-1.5 text-gray-300 hover:text-white hover:bg-gray-700 transition-all duration-200 rounded-xl text-sm font-medium shadow-soft hover:shadow-medium"
-                  >
-                    {copiedCode === codeId ? (
-                      <>
-                        <Check className="w-4 h-4" />
-                        <span>Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4" />
-                        <span>Copy</span>
-                      </>
+                <div className={`bg-gray-800 rounded-t-2xl px-4 py-2.5 flex items-center justify-between border border-gray-700 shadow-soft ${
+                  isStreamingCode ? 'animate-pulse' : ''
+                }`}>
+                  <span className="text-gray-300 text-sm font-mono font-medium">
+                    {part.language}
+                    {isStreamingCode && (
+                      <span className="ml-2 text-green-400 animate-pulse">● streaming</span>
                     )}
-                  </button>
+                  </span>
+                  {!isStreamingCode && (
+                    <button
+                      onClick={() => copyToClipboard(part.content, codeId)}
+                      className="flex items-center space-x-2 px-3 py-1.5 text-gray-300 hover:text-white hover:bg-gray-700 transition-all duration-200 rounded-xl text-sm font-medium shadow-soft hover:shadow-medium"
+                    >
+                      {copiedCode === codeId ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
-                <div className="bg-gray-900 rounded-b-2xl p-4 overflow-x-auto border border-gray-700 border-t-0 shadow-soft">
+                <div className={`bg-gray-900 rounded-b-2xl p-4 overflow-x-auto border border-gray-700 border-t-0 shadow-soft ${
+                  isStreamingCode ? 'relative' : ''
+                }`}>
                   <pre className="text-gray-100 text-sm leading-[1.6] font-mono">
                     <code>{part.content}</code>
                   </pre>
+                  {isStreamingCode && (
+                    <div className="absolute bottom-4 right-4">
+                      <div className="inline-block w-2 h-4 bg-green-400 animate-pulse rounded-sm">▋</div>
+                    </div>
+                  )}
                 </div>
               </div>
             );
           } else {
             return (
               <div key={index} className="whitespace-pre-wrap leading-relaxed text-gray-800">
-                {part.content.trim()}
+                {renderMarkdownText(part.content.trim())}
               </div>
             );
           }
@@ -1468,11 +1736,14 @@ const ChatPage: React.FC = () => {
                   {message.role === 'assistant' && (
                     <div className="flex justify-start mb-8">
                       <div className="max-w-4xl w-full">
+                        {/* Top border - more visible */}
+                        <div className="h-0.5 bg-gradient-to-r from-transparent via-blue-400/80 to-transparent mb-4 mt-2"></div>
+                        
                         <div className="px-6 py-3">
                           <div className="text-base leading-[1.7] text-gray-800 font-normal text-left">
                             {message.content ? (
                               <>
-                                {renderMessageContent(message.content, message.id)}
+                                {renderMessageContent(message.content, message.id, isLoading && currentStreamingMessageId === message.id)}
                                 {/* Show typing indicator if this is the currently streaming message */}
                                 {isLoading && currentStreamingMessageId === message.id && (
                                   <span className="inline-block w-1.5 h-5 bg-primary-500 animate-pulse ml-1 rounded-sm">▋</span>
@@ -1491,9 +1762,6 @@ const ChatPage: React.FC = () => {
                             )}
                           </div>
                         </div>
-                        
-                        {/* Bottom border - more visible */}
-                        <div className="h-0.5 bg-gradient-to-r from-transparent via-blue-400/80 to-transparent mt-4 mb-2"></div>
                         
                         <div className="text-xs text-gray-400 text-left font-medium ml-6">
                           {new Date(message.timestamp).toLocaleTimeString('en-US', {

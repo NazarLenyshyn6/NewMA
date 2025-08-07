@@ -128,19 +128,19 @@ class AgentService(BaseModel):
         # Step 1: Task Classification
         conversation = []
         yield "🧠 Step 1: Task Classification\n"
-        yield "🔍 Understanding your question...\n"
+        yield "🔍 Understanding your question and intent...\n\n"
         tasks = self.task_classification_runner.classify(question)
-        yield f"Identified task(s): `{', '.join(task.lower() for task in tasks)}` ✅  \n\n"
+        yield "✅  \n\n"
 
         # Step 2: Subtask Classification
-        yield "🧠 Step 2: Subtask Classification\n"
-        yield "🔍 Breaking down tasks into smaller subtasks...\n"
+        yield "🪜 Step 2: Subtask Classification\n"
+        yield "🔧 Decomposing the problem into actionable subtasks...\n\n"
         subtasks = self.subtask_classification_runner.classify(question, tasks)
-        yield f"Subtasks: `{', '.join(subtask.lower() for subtask in subtasks)}` ✅ \n\n"
+        yield "✅ \n\n"
 
         # Step 3: Solution Planning
-        yield "🧠 Step 3: Solution Planning\n"
-        yield "🔧 Building a solution strategy...\n"
+        yield "🧭 Step 3: Solution Planning\n"
+        yield "🧩 Strategizing a path to solve your problem...\n\n"
         solution_plans, dependencies = (
             self.solution_planning_runner.generate_solution_plan(
                 question=question,
@@ -152,14 +152,14 @@ class AgentService(BaseModel):
                 subtasks=subtasks,
             )
         )
-        yield "Solution plan created successfully: ✅ \n"
+        yield "✅ \n"
         for i, plan in enumerate(solution_plans, 1):
             yield f"   {i}. {plan}\n"
-        yield "\n"
+        yield "✅"
 
         # Step 4: Code Generation
-        yield "🧠 Step 4: Code Generation\n"
-        yield "🛠️ Generating code snippets from the plan...\n"
+        yield "🛠️ Step 4: Code Generation\n"
+        yield "✍️ Writing code snippets based on the plan...\n\n"
         code_snippets = self.code_generation_runner.generate_code(
             db=db,
             user_id=user_id,
@@ -172,11 +172,11 @@ class AgentService(BaseModel):
                 [dependency.get_avaliable_modules() for dependency in dependencies]
             ),
         )
-        yield f"Generated `{len(code_snippets)}` code snippet(s) ✅ \n\n"
+        yield "✅ \n\n"
 
         # Step 5: Code Stitching
-        yield "🧠 Step 5: Code Stitching\n"
-        yield "🧵 Merging code snippets into a complete solution...\n"
+        yield "🧵 Step 5: Code Assembly\n"
+        yield "🧬 Combining snippets into a unified solution...\n\n"
         code_chunks = []
         async for chunk in self.code_stitching_runner.stitch_stream(
             question, code_snippets
@@ -185,11 +185,11 @@ class AgentService(BaseModel):
             yield chunk
 
         code = "".join(code_chunks)
-        yield "\nCode stitching complete. ✅ \n\n"
+        yield "✅ \n\n"
 
         # Step 6: Code Execution
-        yield "🧠 Step 6: Code Execution\n"
-        yield "🚀 Running the final code...\n"
+        yield "🚀 Step 6: Code Execution\n"
+        yield "🖥️ Running your code and collecting results...\n\n"
         code = re.sub(r"```(?:python)?\n?", "", code).strip()
 
         variables = None
@@ -214,8 +214,9 @@ class AgentService(BaseModel):
             yield "Failed."
         else:
             # Extract analysis_report
-            yield "Successfully executed generated code ✅ "
-            yield "\n🧾 Analysis Report:\n"
+            yield "✅ "
+            yield "🧾 Step 7: Analysis Report\n"
+            yield "🔍 Interpreting results and preparing analysis...\n\n"
             analysis_report = variables.get("analysis_report", [])
             formatted_analysis_report = []
             for idx, step in enumerate(analysis_report, 1):
@@ -232,7 +233,9 @@ class AgentService(BaseModel):
                 conversation.append(chunk)
                 yield chunk
 
-            yield "\n\n✅  💾 Updating Agent memory to reflect all plans, analysis insights, and generated code. This ensures consistency for future steps.\n"
+            yield "✅"
+            yield "\n📦 Finalizing...\n"
+            yield "🧠 Updating Agent memory to retain solution plans, analysis, and generated code for future context.\n\n"
             # Save solution plan
 
             conversation_memory = conversation_memory_manager.get_conversation_history(
