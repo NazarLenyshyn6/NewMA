@@ -304,7 +304,7 @@ class AgentService(BaseModel):
         dataset_summary: str,
     ):
         flow = self.flow_classification_runner.classify(question)
-        print(flow)
+        conversation = []
         if flow == "EXECUTE":
             async for chunk in self.executor_stream(
                 question=question,
@@ -315,6 +315,7 @@ class AgentService(BaseModel):
                 storage_uri=storage_uri,
                 dataset_summary=dataset_summary,
             ):
+                conversation.append(chunk)
                 yield chunk
 
         elif flow == "EXPLAIN":
@@ -326,179 +327,30 @@ class AgentService(BaseModel):
                 storage_uri=storage_uri,
             )
             async for chunk in self.explainer_stream(question, history):
+                conversation.append(chunk)
                 yield chunk
 
         else:
             yield "ASK ABOUT ML"
 
-    # async def chat_stream(
-    #     self,
-    #     question: str,
-    #     db: Session,
-    #     user_id: int,
-    #     session_id: UUID,
-    #     file_name: str,
-    #     storage_uri: str,
-    #     dataset_summary: str,
-    # ):
-    #     # Step 1: Task Classification
-    #     conversation = []
-    #     yield "🧠 Step 1: Task Classification\n"
-    #     yield "🔍 Understanding your question and intent...\n\n"
-    #     tasks = self.task_classification_runner.classify(question)
-    #     yield "✅  \n\n"
-
-    #     # Step 2: Subtask Classification
-    #     yield "🪜 Step 2: Subtask Classification\n"
-    #     yield "🔧 Decomposing the problem into actionable subtasks...\n\n"
-    #     subtasks = self.subtask_classification_runner.classify(question, tasks)
-    #     yield "✅ \n\n"
-
-    #     # Step 3: Solution Planning
-    #     yield "🧭 Step 3: Solution Planning\n"
-    #     yield "🧩 Strategizing a path to solve your problem...\n\n"
-    #     solution_plans, dependencies = (
-    #         self.solution_planning_runner.generate_solution_plan(
-    #             question=question,
-    #             db=db,
-    #             user_id=user_id,
-    #             session_id=session_id,
-    #             file_name=file_name,
-    #             storage_uri=storage_uri,
-    #             subtasks=subtasks,
-    #         )
-    #     )
-    #     yield "✅ \n"
-    #     for i, plan in enumerate(solution_plans, 1):
-    #         yield f"   {i}. {plan}\n"
-    #     yield "✅"
-
-    #     # Step 4: Code Generation
-    #     yield "🛠️ Step 4: Code Generation\n"
-    #     yield "✍️ Writing code snippets based on the plan...\n\n"
-    #     code_snippets = self.code_generation_runner.generate_code(
-    #         db=db,
-    #         user_id=user_id,
-    #         session_id=session_id,
-    #         file_name=file_name,
-    #         storage_uri=storage_uri,
-    #         dataset_summary=dataset_summary,
-    #         instructions=solution_plans,
-    #         dependencies=" ".join(
-    #             [dependency.get_avaliable_modules() for dependency in dependencies]
-    #         ),
-    #     )
-    #     yield "✅ \n\n"
-
-    #     # Step 5: Code Stitching
-    #     yield "🧵 Step 5: Code Assembly\n"
-    #     yield "🧬 Combining snippets into a unified solution...\n\n"
-    #     code_chunks = []
-    #     async for chunk in self.code_stitching_runner.stitch_stream(
-    #         question, code_snippets
-    #     ):
-    #         code_chunks.append(chunk)
-    #         yield chunk
-
-    #     code = "".join(code_chunks)
-    #     yield "✅ \n\n"
-
-    #     # Step 6: Code Execution
-    #     yield "🚀 Step 6: Code Execution\n"
-    #     yield "🖥️ Running your code and collecting results...\n\n"
-    #     code = re.sub(r"```(?:python)?\n?", "", code).strip()
-
-    #     variables = None
-    #     async for chunk in self.code_execution_runner.execute(
-    #         db=db,
-    #         session_id=session_id,
-    #         user_id=user_id,
-    #         file_name=file_name,
-    #         storage_uri=storage_uri,
-    #         code=code,
-    #         dependencies=dependencies[0].get_imputed_modules(),
-    #         max_attempts=3,
-    #     ):
-    #         if isinstance(chunk, dict):
-    #             variables = chunk
-    #             break
-    #         if chunk == "Failed":
-    #             break
-    #         yield chunk
-
-    #     if variables is None:
-    #         yield "Failed."
-    #     else:
-    #         # Extract analysis_report
-    #         yield "✅ "
-    #         yield "🧾 Step 7: Analysis Report\n"
-    #         yield "🔍 Interpreting results and preparing analysis...\n\n"
-    #         analysis_report = variables.get("analysis_report", [])
-    #         formatted_analysis_report = []
-    #         for idx, step in enumerate(analysis_report, 1):
-    #             formatted_analysis_report.append(
-    #                 f"Step {idx}: {step.get('step', '')}\n"
-    #                 f"  Why: {step.get('why', '')}\n"
-    #                 f"  Finding: {step.get('finding', '')}\n"
-    #                 f"  Action: {step.get('action', '')}\n"
-    #             )
-
-    #         report = "\n".join(formatted_analysis_report)
-
-    #         async for chunk in generate_report(report):
-    #             conversation.append(chunk)
-    #             yield chunk
-
-    #         yield "✅"
-    #         yield "\n📦 Finalizing...\n"
-    #         yield "🧠 Updating Agent memory to retain solution plans, analysis, and generated code for future context.\n\n"
-    #         # Save solution plan
-
-    #         conversation_memory = conversation_memory_manager.get_conversation_history(
-    #             db=db,
-    #             user_id=user_id,
-    #             session_id=session_id,
-    #             file_name=file_name,
-    #             storage_uri=storage_uri,
-    #         )
-    #         updated_conversation_memory = conversation_memory + [
-    #             {"question": question, "answer": "".join(conversation)}
-    #         ]
-
-    #         solution_planner_memory_manager.update_solutions_history(
-    #             db=db,
-    #             user_id=user_id,
-    #             session_id=session_id,
-    #             file_name=file_name,
-    #             storage_uri=storage_uri,
-    #             new_solutions=report,
-    #         )
-
-    #         code_variables_memory_manager.update_variables_history(
-    #             db=db,
-    #             user_id=user_id,
-    #             session_id=session_id,
-    #             file_name=file_name,
-    #             storage_uri=storage_uri,
-    #             new_code_variables=variables,
-    #         )
-
-    #         code_generator_memory_manager.update_code_history(
-    #             db=db,
-    #             user_id=user_id,
-    #             session_id=session_id,
-    #             file_name=file_name,
-    #             storage_uri=storage_uri,
-    #             new_code=code,
-    #         )
-    #         conversation_memory_manager.update_conversation_history(
-    #             db=db,
-    #             user_id=user_id,
-    #             session_id=session_id,
-    #             file_name=file_name,
-    #             storage_uri=storage_uri,
-    #             new_conversation=updated_conversation_memory,
-    #         )
+        conversation_memory = conversation_memory_manager.get_conversation_history(
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+        )
+        updated_conversation_memory = conversation_memory + [
+            {"question": question, "answer": "".join(conversation)}
+        ]
+        conversation_memory_manager.update_conversation_history(
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+            new_conversation=updated_conversation_memory,
+        )
 
 
 agent_service = AgentService(
