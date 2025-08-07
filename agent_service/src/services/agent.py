@@ -130,13 +130,13 @@ class AgentService(BaseModel):
         yield "🧠 Step 1: Task Classification\n"
         yield "🔍 Understanding your question...\n"
         tasks = self.task_classification_runner.classify(question)
-        yield f"✅ Identified task(s): `{', '.join(task.lower() for task in tasks)}`\n\n"
+        yield f"Identified task(s): `{', '.join(task.lower() for task in tasks)}` ✅  \n\n"
 
         # Step 2: Subtask Classification
         yield "🧠 Step 2: Subtask Classification\n"
         yield "🔍 Breaking down tasks into smaller subtasks...\n"
         subtasks = self.subtask_classification_runner.classify(question, tasks)
-        yield f"✅ Subtasks: `{', '.join(subtask.lower() for subtask in subtasks)}`\n\n"
+        yield f"Subtasks: `{', '.join(subtask.lower() for subtask in subtasks)}` ✅ \n\n"
 
         # Step 3: Solution Planning
         yield "🧠 Step 3: Solution Planning\n"
@@ -152,7 +152,7 @@ class AgentService(BaseModel):
                 subtasks=subtasks,
             )
         )
-        yield "✅ Solution plan created successfully:\n"
+        yield "Solution plan created successfully: ✅ \n"
         for i, plan in enumerate(solution_plans, 1):
             yield f"   {i}. {plan}\n"
         yield "\n"
@@ -172,7 +172,7 @@ class AgentService(BaseModel):
                 [dependency.get_avaliable_modules() for dependency in dependencies]
             ),
         )
-        yield f"✅ Generated `{len(code_snippets)}` code snippet(s)\n\n"
+        yield f"Generated `{len(code_snippets)}` code snippet(s) ✅ \n\n"
 
         # Step 5: Code Stitching
         yield "🧠 Step 5: Code Stitching\n"
@@ -185,7 +185,7 @@ class AgentService(BaseModel):
             yield chunk
 
         code = "".join(code_chunks)
-        yield "\n✅ Code stitching complete.\n\n"
+        yield "\nCode stitching complete. ✅ \n\n"
 
         # Step 6: Code Execution
         yield "🧠 Step 6: Code Execution\n"
@@ -214,6 +214,7 @@ class AgentService(BaseModel):
             yield "Failed."
         else:
             # Extract analysis_report
+            yield "Successfully executed generated code ✅ "
             yield "\n🧾 Analysis Report:\n"
             analysis_report = variables.get("analysis_report", [])
             formatted_analysis_report = []
@@ -231,7 +232,7 @@ class AgentService(BaseModel):
                 conversation.append(chunk)
                 yield chunk
 
-            yield "\n\n💾 Updating Agent memory to reflect all plans, analysis insights, and generated code. This ensures consistency for future steps.\n"
+            yield "\n\n✅  💾 Updating Agent memory to reflect all plans, analysis insights, and generated code. This ensures consistency for future steps.\n"
             # Save solution plan
 
             conversation_memory = conversation_memory_manager.get_conversation_history(

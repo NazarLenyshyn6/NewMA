@@ -68,13 +68,13 @@ class CodeExecutionRunner(BaseModel):
             yield local_context
 
         except Exception as e:
+            yield "✅"
             code_fixing_message = []
             async for chunk in self.code_debagger.debug(code, str(e), dependencies):
                 code_fixing_message.append(chunk)
                 yield chunk
 
             fixed_code = self._extract_code("".join(code_fixing_message))
-            print(fixed_code)
             async for result in self.execute(
                 db=db,
                 user_id=user_id,

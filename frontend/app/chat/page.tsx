@@ -60,6 +60,8 @@ const ChatPage: React.FC = () => {
   const [sessionActiveFiles, setSessionActiveFiles] = useState<{[sessionId: string]: string | null}>({});
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [streamingMessage, setStreamingMessage] = useState('');
+  const [lastChunkTime, setLastChunkTime] = useState<number>(0);
+  const [currentStreamingMessageId, setCurrentStreamingMessageId] = useState<string | null>(null);
   const [showDeleteSessionModal, setShowDeleteSessionModal] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
   const [showDeleteFileModal, setShowDeleteFileModal] = useState(false);
@@ -74,8 +76,8 @@ const ChatPage: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Debug mode for development
-  const DEBUG_STREAMING = process.env.NODE_ENV === 'development';
+  // Debug mode for development - always enabled for streaming debugging
+  const DEBUG_STREAMING = true;
 
   // Logout function
   const handleLogout = useCallback(() => {
@@ -178,12 +180,12 @@ const ChatPage: React.FC = () => {
           if (part.type === 'code') {
             const codeId = `${messageId}-${index}`;
             return (
-              <div key={index} className="my-4 first:mt-0 last:mb-0">
-                <div className="bg-slate-800 rounded-t-xl px-5 py-3 flex items-center justify-between border border-slate-700">
-                  <span className="text-slate-300 text-sm font-mono font-medium">{part.language}</span>
+              <div key={index} className="my-3 first:mt-0 last:mb-0">
+                <div className="bg-gray-800 rounded-t-2xl px-4 py-2.5 flex items-center justify-between border border-gray-700 shadow-soft">
+                  <span className="text-gray-300 text-sm font-mono font-medium">{part.language}</span>
                   <button
                     onClick={() => copyToClipboard(part.content, codeId)}
-                    className="flex items-center space-x-2 px-3 py-1.5 text-slate-300 hover:text-white hover:bg-slate-700 transition-all duration-200 rounded-lg text-sm font-medium"
+                    className="flex items-center space-x-2 px-3 py-1.5 text-gray-300 hover:text-white hover:bg-gray-700 transition-all duration-200 rounded-xl text-sm font-medium shadow-soft hover:shadow-medium"
                   >
                     {copiedCode === codeId ? (
                       <>
@@ -198,8 +200,8 @@ const ChatPage: React.FC = () => {
                     )}
                   </button>
                 </div>
-                <div className="bg-slate-900 rounded-b-xl p-5 overflow-x-auto border border-slate-700 border-t-0">
-                  <pre className="text-slate-100 text-sm leading-[1.6] font-mono">
+                <div className="bg-gray-900 rounded-b-2xl p-4 overflow-x-auto border border-gray-700 border-t-0 shadow-soft">
+                  <pre className="text-gray-100 text-sm leading-[1.6] font-mono">
                     <code>{part.content}</code>
                   </pre>
                 </div>
@@ -893,6 +895,16 @@ const ChatPage: React.FC = () => {
     setIsLoading(true);
     setStreamingMessage('');
 
+    // Create initial assistant message for streaming
+    const assistantMessageId = (Date.now() + 1).toString();
+    const initialAssistantMessage: Message = {
+      id: assistantMessageId,
+      content: '',
+      role: 'assistant',
+      timestamp: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, initialAssistantMessage]);
+
     try {
       console.log('🚀 Starting streaming request for question:', currentQuestion.substring(0, 50) + '...');
       if (DEBUG_STREAMING) {
@@ -932,38 +944,95 @@ const ChatPage: React.FC = () => {
         let chunkCount = 0;
 
         try {
+          let currentMessageId = assistantMessageId;
+          let currentContent = '';
+          
           while (true) {
             const { done, value } = await reader.read();
             if (done) {
               console.log(`✅ Streaming completed. Total chunks: ${chunkCount}, Final content length: ${fullContent.length}`);
+              setCurrentStreamingMessageId(null);
               break;
             }
 
             // Decode the chunk - this is plain text from the ML agent
             const chunk = decoder.decode(value, { stream: true });
             chunkCount++;
+            const currentTime = Date.now();
             
             if (DEBUG_STREAMING) {
               console.log(`📦 Chunk ${chunkCount}:`, JSON.stringify(chunk));
             }
             
-            // Simply append the chunk to the full content
+            // Check if chunk contains ✅ (new message separator)
+            const containsCheckmark = chunk.includes('✅');
+            
+            if (DEBUG_STREAMING) {
+              console.log(`📦 Chunk ${chunkCount}:`, JSON.stringify(chunk));
+              if (containsCheckmark) {
+                console.log(`✅ CHECKMARK DETECTED! Will create new message wrapper`);
+              }
+            }
+            
+            // If chunk contains ✅, split the content and create new message
+            if (containsCheckmark) {
+              // Split content at ✅ 
+              const parts = chunk.split('✅');
+              const beforeCheckmark = parts[0];
+              const afterCheckmark = parts.slice(1).join('✅'); // In case multiple ✅
+              
+              // Add content before ✅ to current message (including the ✅)
+              currentContent += beforeCheckmark + '✅';
+              
+              // Update current message with content up to ✅
+              setMessages(prev => prev.map(msg => 
+                msg.id === currentMessageId 
+                  ? { ...msg, content: currentContent }
+                  : msg
+              ));
+              
+              console.log(`🔄 CREATING NEW MESSAGE WRAPPER after ✅`);
+              console.log(`📝 Previous message finalized with: "${currentContent}"`);
+              
+              // Create completely new assistant message wrapper
+              const newMessageId = `${Date.now()}-${Math.random()}`;
+              const newMessage: Message = {
+                id: newMessageId,
+                content: afterCheckmark, // Start new message with content after ✅
+                role: 'assistant',
+                timestamp: new Date().toISOString(),
+              };
+              
+              console.log(`✨ Created new message with ID: ${newMessageId}`);
+              console.log(`📝 New message starts with: "${afterCheckmark}"`);
+              
+              // Add the new message to the conversation
+              setMessages(prev => [...prev, newMessage]);
+              
+              // Switch to streaming into the new message
+              currentMessageId = newMessageId;
+              currentContent = afterCheckmark; // Reset content tracking for new message
+            } else {
+              // Continue building current message (no ✅ found)
+              currentContent += chunk;
+              
+              // Update the current assistant message in real-time
+              setMessages(prev => prev.map(msg => 
+                msg.id === currentMessageId 
+                  ? { ...msg, content: currentContent }
+                  : msg
+              ));
+            }
+            
             fullContent += chunk;
-            setStreamingMessage(fullContent);
+            setCurrentStreamingMessageId(currentMessageId);
+            setLastChunkTime(currentTime);
           }
         } catch (readError) {
           console.error('❌ Error reading stream:', readError);
           // If streaming fails, fall back to regular chat
           throw readError;
         }
-
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content: fullContent || 'No response received',
-          role: 'assistant',
-          timestamp: new Date().toISOString(),
-        };
-        setMessages(prev => [...prev, assistantMessage]);
       } else {
         // Fallback to regular chat endpoint
         console.log(`❌ Streaming failed with status ${response.status}, falling back to regular chat endpoint`);
@@ -992,29 +1061,29 @@ const ChatPage: React.FC = () => {
             content = await fallbackResponse.text();
           }
           
-          const assistantMessage: Message = {
-            id: (Date.now() + 1).toString(),
-            content: content || 'No response received',
-            role: 'assistant',
-            timestamp: new Date().toISOString(),
-          };
-          setMessages(prev => [...prev, assistantMessage]);
+          // Update the existing assistant message with fallback content
+          setMessages(prev => prev.map(msg => 
+            msg.id === assistantMessageId 
+              ? { ...msg, content: content || 'No response received' }
+              : msg
+          ));
         } else {
           throw new Error('Failed to get response');
         }
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: 'Sorry, I encountered an error. Please try again.',
-        role: 'assistant',
-        timestamp: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      // Update the existing assistant message with error
+      setMessages(prev => prev.map(msg => 
+        msg.id === assistantMessageId 
+          ? { ...msg, content: 'Sorry, I encountered an error. Please try again.' }
+          : msg
+      ));
     } finally {
       setIsLoading(false);
       setStreamingMessage('');
+      setLastChunkTime(0);
+      setCurrentStreamingMessageId(null);
     }
   };
 
@@ -1074,7 +1143,7 @@ const ChatPage: React.FC = () => {
   }, [messages, streamingMessage]);
 
   return (
-    <div className="h-screen bg-white flex relative">
+    <div className="h-screen bg-gray-25 flex relative">
       {/* Mobile backdrop */}
       {(leftSidebarOpen || rightSidebarOpen) && (
         <div 
@@ -1089,42 +1158,42 @@ const ChatPage: React.FC = () => {
       {/* Left Sidebar - Chat History */}
       <div className={`${
         leftSidebarOpen ? 'w-80 md:w-80' : 'w-0'
-      } transition-all duration-500 ease-in-out overflow-hidden bg-white flex flex-col ${
-        leftSidebarOpen ? 'fixed md:relative z-40 md:z-auto h-full shadow-xl' : ''
-      } border-r border-blue-100`}>
+      } transition-all duration-300 ease-in-out overflow-hidden bg-white flex flex-col ${
+        leftSidebarOpen ? 'fixed md:relative z-40 md:z-auto h-full shadow-strong' : ''
+      } border-r border-gray-200`}>
         {/* Sidebar Header */}
-        <div className="p-8 border-b border-gray-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 hover:bg-blue-700">
+        <div className="p-6 border-b border-gray-200 bg-white shadow-soft">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center space-x-3">
+              <div className="w-11 h-11 bg-primary-600 rounded-2xl flex items-center justify-center shadow-soft hover:shadow-medium transition-all duration-200 hover:bg-primary-700">
                 <Bot className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-gray-800 font-bold text-xl">ML Agent</h1>
-                <p className="text-blue-600 text-sm font-medium">Intelligent Data Assistant</p>
+                <h1 className="text-gray-900 font-bold text-lg">ML Agent</h1>
+                <p className="text-primary-600 text-sm font-medium">Intelligent Data Assistant</p>
               </div>
             </div>
             <button
               onClick={() => setLeftSidebarOpen(false)}
-              className="p-2 hover:bg-blue-100 rounded-xl transition-all duration-200 group shadow-sm hover:shadow-md"
+              className="p-2.5 hover:bg-primary-50 rounded-2xl transition-all duration-200 group shadow-soft hover:shadow-medium"
               title="Close sidebar"
             >
-              <X className="w-5 h-5 text-blue-400 group-hover:text-blue-600" />
+              <X className="w-4 h-4 text-primary-400 group-hover:text-primary-600" />
             </button>
           </div>
           <button
             onClick={() => setShowNewSessionModal(true)}
-            className="w-full flex items-center justify-center space-x-4 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all duration-200 font-semibold shadow-md hover:shadow-lg"
+            className="w-full flex items-center justify-center space-x-3 px-5 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-2xl transition-all duration-200 font-semibold shadow-soft hover:shadow-medium hover:scale-[1.02]"
           >
             <Plus className="w-5 h-5" />
             <span className="text-base">New Chat</span>
-            <div className="w-2 h-2 bg-white/40 rounded-full animate-pulse"></div>
+            <div className="w-2 h-2 bg-white/30 rounded-full animate-bounce-subtle"></div>
           </button>
         </div>
 
         {/* Chat Sessions */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-3">
-          <div className="text-blue-600 text-sm font-semibold uppercase tracking-wider mb-6 px-3">
+        <div className="flex-1 overflow-y-auto p-5 space-y-2.5">
+          <div className="text-primary-600 text-sm font-semibold uppercase tracking-wider mb-5 px-2">
             Recent Conversations
           </div>
           {sessions.map((session, index) => (
@@ -1133,16 +1202,16 @@ const ChatPage: React.FC = () => {
               className="opacity-0 animate-fade-in"
               style={{ animationDelay: `${index * 0.05}s`, animationFillMode: 'forwards' }}
             >
-              <div className={`w-full text-left p-5 rounded-2xl transition-all duration-300 group relative overflow-hidden shadow-md hover:shadow-lg ${
+              <div className={`w-full text-left p-4 rounded-2xl transition-all duration-300 group relative overflow-hidden shadow-soft hover:shadow-medium ${
                 currentSession?.id === session.id
-                  ? 'bg-blue-50 text-blue-900 border-2 border-blue-200 shadow-md'
-                  : 'bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-900 hover:shadow-xl hover:transform hover:scale-[1.01] hover:-translate-y-1 border border-gray-200 hover:border-blue-200'
+                  ? 'bg-primary-50 text-primary-900 border-2 border-primary-200 shadow-medium'
+                  : 'bg-white text-gray-700 hover:bg-primary-50 hover:text-primary-900 hover:shadow-strong hover:transform hover:scale-[1.02] hover:-translate-y-0.5 border border-gray-200 hover:border-primary-200'
               }`}>
-                <div className="flex items-center space-x-4">
-                  <div className={`w-3 h-3 rounded-full transition-all duration-300 shadow-sm ${
+                <div className="flex items-center space-x-3">
+                  <div className={`w-2.5 h-2.5 rounded-full transition-all duration-300 shadow-sm ${
                     currentSession?.id === session.id 
-                      ? 'bg-blue-500 shadow-lg animate-pulse' 
-                      : 'bg-gray-400 group-hover:bg-blue-400'
+                      ? 'bg-primary-500 shadow-glow animate-bounce-subtle' 
+                      : 'bg-gray-400 group-hover:bg-primary-400'
                   }`} />
                   <div 
                     className="min-w-0 flex-1 cursor-pointer"
@@ -1166,15 +1235,15 @@ const ChatPage: React.FC = () => {
                     {currentSession?.id === session.id && (
                       <>
                         {activeFile?.file_name ? (
-                          <div className="flex items-center space-x-2 mt-3 px-3 py-2 bg-green-50 text-green-700 rounded-lg text-xs font-semibold shadow-sm border border-green-200">
+                          <div className="flex items-center space-x-2 mt-2.5 px-2.5 py-1.5 bg-success-50 text-success-700 rounded-xl text-xs font-semibold shadow-soft border border-success-200">
                             <File className="w-3.5 h-3.5" />
                             <span className="truncate max-w-[100px]">
                               📊 {activeFile.file_name}
                             </span>
-                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-sm"></div>
+                            <div className="w-1.5 h-1.5 bg-success-500 rounded-full animate-bounce-subtle shadow-sm"></div>
                           </div>
                         ) : (
-                          <div className="text-xs text-gray-400 mt-2 px-3 italic">
+                          <div className="text-xs text-gray-400 mt-2 px-2 italic">
                             No dataset selected
                           </div>
                         )}
@@ -1182,10 +1251,10 @@ const ChatPage: React.FC = () => {
                     )}
                   </div>
                   <div className="flex items-center space-x-3">
-                    <MessageSquare className={`w-5 h-5 transition-all duration-200 ${
+                    <MessageSquare className={`w-4 h-4 transition-all duration-200 ${
                       currentSession?.id === session.id 
-                        ? 'text-blue-600' 
-                        : 'text-gray-400 group-hover:text-blue-500'
+                        ? 'text-primary-600' 
+                        : 'text-gray-400 group-hover:text-primary-500'
                     }`} />
                     <button
                       onClick={(e) => {
@@ -1193,10 +1262,10 @@ const ChatPage: React.FC = () => {
                         deleteSession(session);
                       }}
                       disabled={currentSession?.id === session.id}
-                      className={`p-2 rounded-xl transition-all duration-200 shadow-sm ${
+                      className={`p-2 rounded-2xl transition-all duration-200 shadow-soft ${
                         currentSession?.id === session.id
                           ? 'opacity-30 cursor-not-allowed text-gray-400'
-                          : 'opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-500 hover:shadow-md hover:scale-110'
+                          : 'opacity-0 group-hover:opacity-100 hover:bg-error-50 hover:text-error-500 hover:shadow-medium hover:scale-110'
                       }`}
                       title={currentSession?.id === session.id ? 'Cannot delete active session' : 'Delete session'}
                     >
@@ -1207,7 +1276,7 @@ const ChatPage: React.FC = () => {
                 
                 {/* Active session indicator */}
                 {currentSession?.id === session.id && (
-                  <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1.5 h-10 bg-blue-600 rounded-r-full shadow-sm" />
+                  <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-primary-600 rounded-r-full shadow-glow" />
                 )}
               </div>
             </div>
@@ -1215,46 +1284,46 @@ const ChatPage: React.FC = () => {
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-6 border-t border-gray-200 bg-white shadow-sm">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 hover:bg-blue-700">
+        <div className="p-5 border-t border-gray-200 bg-white shadow-soft">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-primary-600 rounded-2xl flex items-center justify-center shadow-soft hover:shadow-medium transition-all duration-200 hover:bg-primary-700">
               <User className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-gray-800 font-semibold text-base">User</div>
-              <div className="text-blue-600 text-sm font-medium">Free Plan</div>
+              <div className="text-gray-900 font-semibold text-sm">User</div>
+              <div className="text-primary-600 text-xs font-medium">Free Plan</div>
             </div>
             <button
               onClick={handleLogout}
-              className="p-3 hover:bg-red-100 rounded-xl transition-all duration-200 text-gray-500 hover:text-red-600 group shadow-sm hover:shadow-md hover:scale-110"
+              className="p-2.5 hover:bg-error-50 rounded-2xl transition-all duration-200 text-gray-500 hover:text-error-600 group shadow-soft hover:shadow-medium hover:scale-110"
               title="Sign out"
             >
-              <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              <LogOut className="w-4 h-4 group-hover:scale-110 transition-transform" />
             </button>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className="flex-1 flex flex-col bg-gray-25">
         {/* Header */}
-        <div className="bg-white border-b border-blue-100 px-8 py-5 flex items-center justify-between shadow-md">
+        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-soft">
           <div className="flex items-center space-x-4">
             {!leftSidebarOpen && (
               <button
                 onClick={() => setLeftSidebarOpen(true)}
-                className="p-3 hover:bg-blue-100 rounded-2xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-105"
+                className="p-2.5 hover:bg-primary-50 rounded-2xl transition-all duration-200 group shadow-soft hover:shadow-medium hover:scale-105"
               >
-                <Menu className="w-6 h-6 text-blue-500 group-hover:text-blue-700" />
+                <Menu className="w-5 h-5 text-primary-500 group-hover:text-primary-700" />
               </button>
             )}
             <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-gray-800">
+              <h1 className="text-xl font-bold text-gray-900">
                 {currentSession?.title || 'ML Agent'}
               </h1>
               {activeFile && (
-                <div className="flex items-center space-x-3 px-4 py-2.5 bg-green-50 text-green-700 rounded-lg text-base font-semibold shadow-sm border border-green-200 hover:shadow-md transition-all duration-200">
-                  <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse shadow-sm"></div>
+                <div className="flex items-center space-x-2.5 px-3.5 py-2 bg-success-50 text-success-700 rounded-2xl text-sm font-semibold shadow-soft border border-success-200 hover:shadow-medium transition-all duration-200">
+                  <div className="w-2 h-2 bg-success-500 rounded-full animate-bounce-subtle shadow-sm"></div>
                   <File className="w-4 h-4" />
                   <span>{activeFile.file_name}</span>
                 </div>
@@ -1272,7 +1341,7 @@ const ChatPage: React.FC = () => {
                   className={`flex items-center space-x-2 px-4 py-3 rounded-2xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-105 font-semibold ${
                     savingConversation || isLoading
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg'
+                      : 'bg-success-600 hover:bg-success-700 text-white shadow-medium hover:shadow-strong'
                   }`}
                   title={isLoading ? "Please wait for the response to complete" : "Save conversation"}
                 >
@@ -1296,8 +1365,8 @@ const ChatPage: React.FC = () => {
                 {saveMessage && (
                   <div className={`absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 text-sm rounded-lg shadow-lg z-50 whitespace-nowrap ${
                     saveMessage.includes('success') 
-                      ? 'bg-green-100 text-green-800 border border-green-200'
-                      : 'bg-red-100 text-red-800 border border-red-200'
+                      ? 'bg-success-100 text-success-800 border border-success-200'
+                      : 'bg-error-100 text-error-800 border border-error-200'
                   }`}>
                     {saveMessage}
                   </div>
@@ -1306,10 +1375,10 @@ const ChatPage: React.FC = () => {
             )}
             <button
               onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-              className={`p-3 rounded-2xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-105 ${
+              className={`p-2.5 rounded-2xl transition-all duration-200 group shadow-soft hover:shadow-medium hover:scale-105 ${
                 rightSidebarOpen 
-                  ? 'bg-blue-100 text-blue-600 shadow-md' 
-                  : 'hover:bg-blue-100 text-blue-500 hover:text-blue-700'
+                  ? 'bg-primary-100 text-primary-600 shadow-medium' 
+                  : 'hover:bg-primary-100 text-primary-500 hover:text-primary-700'
               }`}
               title="Dataset Files"
             >
@@ -1318,10 +1387,10 @@ const ChatPage: React.FC = () => {
             {leftSidebarOpen && (
               <button
                 onClick={() => setLeftSidebarOpen(false)}
-                className="p-3 hover:bg-blue-100 rounded-2xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-105"
+                className="p-2.5 hover:bg-primary-50 rounded-2xl transition-all duration-200 group shadow-soft hover:shadow-medium hover:scale-105"
                 title="Close sidebar"
               >
-                <X className="w-6 h-6 text-blue-500 group-hover:text-blue-700" />
+                <X className="w-5 h-5 text-primary-500 group-hover:text-primary-700" />
               </button>
             )}
           </div>
@@ -1331,40 +1400,40 @@ const ChatPage: React.FC = () => {
         <div className="flex-1 overflow-y-auto bg-white">
           {!currentSession ? (
             <div className="h-full flex items-center justify-center p-12">
-              <div className="text-center max-w-3xl bg-white rounded-3xl p-12 shadow-xl border border-blue-100">
-                <div className="mb-10">
-                  <div className="w-24 h-24 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-lg transition-all duration-200">
-                    <Bot className="w-12 h-12 text-white" />
+              <div className="text-center max-w-3xl bg-white rounded-3xl p-8 shadow-strong border border-primary-100">
+                <div className="mb-8">
+                  <div className="w-18 h-18 bg-primary-600 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-medium transition-all duration-200">
+                    <Bot className="w-10 h-10 text-white" />
                   </div>
-                  <h2 className="text-5xl font-bold text-gray-800 mb-6">
-                    Welcome to <span className="text-blue-600 font-bold">ML Agent</span>
+                  <h2 className="text-4xl font-bold text-gray-900 mb-5">
+                    Welcome to <span className="text-primary-600 font-bold">ML Agent</span>
                   </h2>
-                  <p className="text-xl text-gray-600 mb-10 leading-relaxed font-medium">
+                  <p className="text-lg text-gray-600 mb-8 leading-relaxed font-medium">
                     Your independent AI assistant for advanced data analysis, insights, and machine learning solutions
                   </p>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-                  <div className="bg-white rounded-3xl p-8 shadow-xl border-2 border-blue-100 hover:shadow-2xl transition-all duration-300 hover:scale-105 hover:-translate-y-2">
-                    <div className="w-16 h-16 bg-orange-500 rounded-xl flex items-center justify-center mb-6 shadow-md hover:shadow-lg transition-all duration-200">
-                      <Database className="w-8 h-8 text-white" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  <div className="bg-white rounded-3xl p-5 shadow-medium border border-primary-200 hover:shadow-strong transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
+                    <div className="w-12 h-12 bg-orange-500 rounded-2xl flex items-center justify-center mb-4 shadow-soft hover:shadow-medium transition-all duration-200">
+                      <Database className="w-6 h-6 text-white" />
                     </div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-3">Data Analysis</h3>
-                    <p className="text-gray-600 text-base font-medium">Upload your datasets and get instant insights, visualizations, and statistical analysis</p>
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">Data Analysis</h3>
+                    <p className="text-gray-600 text-sm font-medium">Upload your datasets and get instant insights, visualizations, and statistical analysis</p>
                   </div>
                   
-                  <div className="bg-white rounded-3xl p-8 shadow-xl border-2 border-blue-100 hover:shadow-2xl transition-all duration-300 hover:scale-105 hover:-translate-y-2">
-                    <div className="w-16 h-16 bg-teal-500 rounded-xl flex items-center justify-center mb-6 shadow-md hover:shadow-lg transition-all duration-200">
-                      <Zap className="w-8 h-8 text-white" />
+                  <div className="bg-white rounded-3xl p-5 shadow-medium border border-primary-200 hover:shadow-strong transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
+                    <div className="w-12 h-12 bg-indigo-500 rounded-2xl flex items-center justify-center mb-4 shadow-soft hover:shadow-medium transition-all duration-200">
+                      <Zap className="w-6 h-6 text-white" />
                     </div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-3">Smart Insights</h3>
-                    <p className="text-gray-600 text-base font-medium">AI-powered recommendations and predictive analytics for your business decisions</p>
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">Smart Insights</h3>
+                    <p className="text-gray-600 text-sm font-medium">AI-powered recommendations and predictive analytics for your business decisions</p>
                   </div>
                 </div>
                 
                 <button
                   onClick={() => setShowNewSessionModal(true)}
-                  className="inline-flex items-center space-x-4 px-10 py-5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
+                  className="inline-flex items-center space-x-3 px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold text-base rounded-2xl transition-all duration-200 shadow-medium hover:shadow-strong"
                 >
                   <Plus className="w-6 h-6" />
                   <span>Start New Conversation</span>
@@ -1378,9 +1447,9 @@ const ChatPage: React.FC = () => {
                 <div key={message.id}>
                   {/* User message - standalone, aligned right */}
                   {message.role === 'user' && (
-                    <div className="flex justify-end mb-8">
+                    <div className="flex justify-end mb-6">
                       <div className="max-w-2xl">
-                        <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl px-6 py-4 shadow-lg hover:shadow-xl transition-all duration-200">
+                        <div className="bg-primary-600 text-white rounded-2xl px-5 py-3.5 shadow-medium hover:shadow-strong transition-all duration-200">
                           <div className="text-base leading-relaxed font-medium">
                             {renderMessageContent(message.content, message.id)}
                           </div>
@@ -1397,11 +1466,29 @@ const ChatPage: React.FC = () => {
                   
                   {/* AI response - aligned left */}
                   {message.role === 'assistant' && (
-                    <div className="flex justify-start mb-8">
+                    <div className="flex justify-start mb-6">
                       <div className="max-w-4xl w-full">
-                        <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-2xl px-6 py-5 shadow-lg hover:shadow-xl transition-all duration-200 border border-slate-200">
+                        <div className="bg-white rounded-2xl px-5 py-4 shadow-medium hover:shadow-strong transition-all duration-200 border border-gray-200">
                           <div className="text-base leading-[1.7] text-gray-800 font-normal">
-                            {renderMessageContent(message.content, message.id)}
+                            {message.content ? (
+                              <>
+                                {renderMessageContent(message.content, message.id)}
+                                {/* Show typing indicator if this is the currently streaming message */}
+                                {isLoading && currentStreamingMessageId === message.id && (
+                                  <span className="inline-block w-1.5 h-5 bg-primary-500 animate-pulse ml-1 rounded-sm">▋</span>
+                                )}
+                              </>
+                            ) : (
+                              /* Loading state for empty assistant message */
+                              <div className="flex items-center gap-4 text-gray-600">
+                                <div className="flex gap-1">
+                                  <div className="w-2.5 h-2.5 bg-primary-400 rounded-full animate-bounce"></div>
+                                  <div className="w-2.5 h-2.5 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                                  <div className="w-2.5 h-2.5 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                                </div>
+                                <span className="text-base font-medium">Analyzing your data and preparing insights...</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="text-xs text-gray-500 mt-2 ml-1 font-medium">
@@ -1409,6 +1496,13 @@ const ChatPage: React.FC = () => {
                             hour: '2-digit',
                             minute: '2-digit'
                           })}
+                          {/* Show AI is responding indicator only for currently streaming message */}
+                          {isLoading && currentStreamingMessageId === message.id && (
+                            <>
+                              <span className="mx-2">•</span>
+                              <span className="text-green-500">AI is responding...</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1416,91 +1510,93 @@ const ChatPage: React.FC = () => {
                 </div>
               ))}
               
-              {/* Current AI response thread (only when AI is responding) */}
-              {isLoading && (
-                <div className="flex justify-start mb-8">
-                  <div className="max-w-4xl w-full">
-                    {streamingMessage ? (
-                      <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-2xl px-6 py-5 shadow-lg hover:shadow-xl transition-all duration-200 border border-slate-200">
-                        <div className="text-base leading-[1.7] text-gray-800 font-normal">
-                          {renderMessageContent(streamingMessage, 'streaming')}
-                          <span className="inline-block w-1.5 h-5 bg-blue-500 animate-pulse ml-1 rounded-sm">▋</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-2xl px-6 py-5 shadow-lg hover:shadow-xl transition-all duration-200 border border-slate-200">
-                        <div className="flex items-center gap-4 text-gray-600">
-                          <div className="flex gap-1">
-                            <div className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce"></div>
-                            <div className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                          </div>
-                          <span className="text-base font-medium">Analyzing your data and preparing insights...</span>
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2 mt-2 ml-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-xs text-gray-500 font-medium">AI is responding...</span>
-                    </div>
-                  </div>
-                </div>
-              )}
               
               <div ref={messagesEndRef} />
             </div>
           )}
         </div>
 
-        {/* Input Area - Seamlessly integrated */}
+        {/* Input Area - Enhanced and optimized */}
         {currentSession && (
-          <div className="bg-white border-t border-gray-100 pb-6 pt-6">
-            <div className="max-w-4xl mx-auto px-6">
-              <div className="flex justify-center">
-                <div className="max-w-2xl w-full">
-                  <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-2xl border border-slate-200 shadow-lg hover:shadow-xl transition-all duration-200 overflow-hidden">
-                    <div className="flex items-end">
-                      <div className="flex-1 p-5">
-                        <textarea
-                          value={inputMessage}
-                          onChange={(e) => setInputMessage(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              sendMessage();
-                            }
-                          }}
-                          placeholder={`Ask ML Agent${activeFile ? ` about ${activeFile.file_name}` : ' anything about your data'}...`}
-                          className="w-full bg-transparent border-none resize-none focus:outline-none text-gray-800 placeholder-gray-500 text-base leading-relaxed font-medium"
-                          rows={1}
-                          style={{ minHeight: '24px', maxHeight: '120px' }}
-                          onInput={(e) => {
-                            const target = e.target as HTMLTextAreaElement;
-                            target.style.height = 'auto';
-                            target.style.height = Math.min(target.scrollHeight, 120) + 'px';
-                          }}
-                          disabled={isLoading}
-                        />
-                      </div>
-                      <div className="p-4">
-                        <button
-                          onClick={sendMessage}
-                          disabled={!inputMessage.trim() || isLoading}
-                          className={`p-3 rounded-xl transition-all duration-200 ${
-                            inputMessage.trim() && !isLoading
-                              ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl hover:scale-105'
-                              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                          }`}
-                        >
+          <div className="max-w-4xl mx-auto px-6 py-6">
+            <div className="flex justify-start">
+              <div className="max-w-4xl w-full">
+                <div className={`bg-gradient-to-br from-white via-slate-50 to-gray-50 rounded-2xl border-2 transition-all duration-300 overflow-hidden ${
+                  inputMessage.trim() 
+                    ? 'border-primary-300 shadow-medium shadow-primary-100/50 hover:shadow-strong hover:shadow-primary-200/60' 
+                    : 'border-slate-200 shadow-md hover:border-slate-300 hover:shadow-lg'
+                }`}>
+                  <div className="flex items-stretch">
+                    <div className="flex-1 relative">
+                      {/* Enhanced textarea with better positioning */}
+                      <textarea
+                        value={inputMessage}
+                        onChange={(e) => setInputMessage(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            sendMessage();
+                          }
+                        }}
+                        placeholder={`Ask ML Agent${activeFile ? ` about ${activeFile.file_name}` : ' anything about your data'}...`}
+                        className="w-full bg-transparent border-none resize-none focus:outline-none text-gray-800 placeholder-gray-500 text-base leading-[1.6] font-medium px-6 py-5 min-h-[60px] max-h-[140px] transition-all duration-200"
+                        rows={2}
+                        onInput={(e) => {
+                          const target = e.target as HTMLTextAreaElement;
+                          target.style.height = 'auto';
+                          const newHeight = Math.min(Math.max(target.scrollHeight, 60), 140);
+                          target.style.height = newHeight + 'px';
+                        }}
+                        disabled={isLoading}
+                      />
+                      
+                      {/* Focus indicator */}
+                      <div className={`absolute inset-0 rounded-2xl pointer-events-none transition-all duration-300 ${
+                        inputMessage.trim() ? 'ring-2 ring-blue-400/20 ring-offset-2 ring-offset-transparent' : ''
+                      }`}></div>
+                    </div>
+                    
+                    {/* Enhanced button with better positioning */}
+                    <div className="flex items-end p-4">
+                      <button
+                        onClick={sendMessage}
+                        disabled={!inputMessage.trim() || isLoading}
+                        className={`group relative overflow-hidden rounded-xl transition-all duration-300 ${
+                          inputMessage.trim() && !isLoading
+                            ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 hover:from-blue-600 hover:via-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-600/40 hover:scale-105 active:scale-95'
+                            : 'bg-gradient-to-br from-gray-200 to-gray-300 text-gray-500 cursor-not-allowed shadow-sm'
+                        } p-3.5 min-w-[52px] min-h-[52px] flex items-center justify-center`}
+                      >
+                        {/* Button background animation */}
+                        {inputMessage.trim() && !isLoading && (
+                          <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        )}
+                        
+                        {/* Button icon */}
+                        <div className="relative z-10">
                           {isLoading ? (
-                            <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                           ) : (
-                            <Send className="w-5 h-5" />
+                            <Send className={`w-5 h-5 transition-transform duration-200 ${
+                              inputMessage.trim() ? 'group-hover:translate-x-0.5 group-hover:-translate-y-0.5' : ''
+                            }`} />
                           )}
-                        </button>
-                      </div>
+                        </div>
+                        
+                        {/* Ripple effect on click */}
+                        {inputMessage.trim() && !isLoading && (
+                          <div className="absolute inset-0 rounded-xl opacity-0 group-active:opacity-30 bg-white transition-opacity duration-150"></div>
+                        )}
+                      </button>
                     </div>
                   </div>
+                  
+                  {/* Bottom gradient line for visual enhancement */}
+                  <div className={`h-0.5 bg-gradient-to-r transition-all duration-300 ${
+                    inputMessage.trim() 
+                      ? 'from-blue-400 via-blue-500 to-blue-600 opacity-60' 
+                      : 'from-transparent via-gray-300 to-transparent opacity-30'
+                  }`}></div>
                 </div>
               </div>
             </div>
@@ -1510,22 +1606,22 @@ const ChatPage: React.FC = () => {
 
       {/* Right Sidebar - Files */}
       <div className={`${
-        rightSidebarOpen ? 'w-[420px] md:w-[420px]' : 'w-0'
-      } transition-all duration-500 ease-in-out overflow-hidden bg-white border-l border-blue-100 flex flex-col ${
-        rightSidebarOpen ? 'fixed md:relative z-40 md:z-auto right-0 h-full shadow-xl' : ''
+        rightSidebarOpen ? 'w-80 md:w-80' : 'w-0'
+      } transition-all duration-300 ease-in-out overflow-hidden bg-white border-l border-gray-200 flex flex-col ${
+        rightSidebarOpen ? 'fixed md:relative z-40 md:z-auto right-0 h-full shadow-strong' : ''
       }`}>
         {/* Files Header */}
-        <div className="p-8 border-b border-gray-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 hover:bg-purple-700">
+        <div className="p-6 border-b border-gray-200 bg-white shadow-soft">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center space-x-3">
+              <div className="w-11 h-11 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-soft hover:shadow-medium transition-all duration-200 hover:bg-indigo-700">
                 {showDatasetInfoTab ? <Info className="w-6 h-6 text-white" /> : <Database className="w-6 h-6 text-white" />}
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">
+                <h2 className="text-lg font-bold text-gray-900">
                   {showDatasetInfoTab ? 'Dataset Information' : 'Dataset Files'}
                 </h2>
-                <p className="text-sm text-blue-600 font-medium">
+                <p className="text-sm text-indigo-600 font-medium">
                   {showDatasetInfoTab 
                     ? 'Detailed analysis summary' 
                     : `${files.length} file${files.length !== 1 ? 's' : ''} available`
@@ -1540,56 +1636,56 @@ const ChatPage: React.FC = () => {
                     setShowDatasetInfoTab(false);
                     setSelectedDatasetInfo(null);
                   }}
-                  className="p-2.5 hover:bg-blue-100 rounded-xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-110"
+                  className="p-2.5 hover:bg-indigo-50 rounded-2xl transition-all duration-200 group shadow-soft hover:shadow-medium hover:scale-110"
                   title="Back to files"
                 >
-                  <ArrowRight className="w-6 h-6 text-blue-500 group-hover:text-blue-700 rotate-180" />
+                  <ArrowRight className="w-5 h-5 text-indigo-500 group-hover:text-indigo-700 rotate-180" />
                 </button>
               )}
               <button
                 onClick={() => setRightSidebarOpen(false)}
-                className="p-2.5 hover:bg-blue-100 rounded-xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-110"
+                className="p-2.5 hover:bg-primary-50 rounded-2xl transition-all duration-200 group shadow-soft hover:shadow-medium hover:scale-110"
               >
-                <X className="w-6 h-6 text-blue-500 group-hover:text-blue-700" />
+                <X className="w-5 h-5 text-primary-500 group-hover:text-primary-700" />
               </button>
             </div>
           </div>
           {!showDatasetInfoTab && (
             <button
               onClick={() => setShowUploadModal(true)}
-              className="w-full flex items-center justify-center space-x-4 px-6 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-all duration-200 font-semibold text-base shadow-md hover:shadow-lg"
+              className="w-full flex items-center justify-center space-x-3 px-5 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all duration-200 font-semibold shadow-soft hover:shadow-medium hover:scale-[1.02]"
             >
               <Upload className="w-5 h-5" />
               <span>Upload Dataset</span>
-              <div className="w-2 h-2 bg-white/40 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-white/30 rounded-full animate-bounce-subtle"></div>
             </button>
           )}
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-6">
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {showDatasetInfoTab && selectedDatasetInfo ? (
-            /* Dataset Info Tab */
+            // Dataset Info Tab
             <div className="space-y-6">
               {/* Dataset Name */}
-              <div className="bg-blue-50 rounded-xl p-6 border border-blue-200 shadow-sm">
-                <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center">
-                  <File className="w-5 h-5 mr-3 text-blue-600" />
+              <div className="bg-primary-50 rounded-2xl p-5 border border-primary-200 shadow-soft">
+                <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center">
+                  <File className="w-4 h-4 mr-2.5 text-primary-600" />
                   Dataset Name
                 </h3>
-                <p className="text-xl font-semibold text-blue-700 bg-white px-4 py-3 rounded-xl shadow-sm border border-blue-200">
+                <p className="text-base font-semibold text-primary-700 bg-white px-3.5 py-2.5 rounded-xl shadow-soft border border-primary-200 break-all">
                   {selectedDatasetInfo.file_name}
                 </p>
               </div>
 
               {/* Description */}
               {selectedDatasetInfo.description && (
-                <div className="bg-green-50 rounded-xl p-6 border border-green-200 shadow-sm">
-                  <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center">
-                    <FileText className="w-5 h-5 mr-3 text-emerald-600" />
+                <div className="bg-orange-50 rounded-2xl p-5 border border-orange-200 shadow-soft">
+                  <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center">
+                    <FileText className="w-4 h-4 mr-2.5 text-orange-600" />
                     Description
                   </h3>
-                  <p className="text-gray-700 bg-white px-4 py-3 rounded-xl shadow-sm border border-emerald-200 leading-relaxed">
+                  <p className="text-gray-700 bg-white px-3.5 py-2.5 rounded-xl shadow-soft border border-orange-200 leading-relaxed">
                     {selectedDatasetInfo.description}
                   </p>
                 </div>
@@ -1597,12 +1693,12 @@ const ChatPage: React.FC = () => {
 
               {/* Summary */}
               {selectedDatasetInfo.summary && (
-                <div className="bg-purple-50 rounded-xl p-6 border border-purple-200 shadow-sm">
-                  <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center">
-                    <Database className="w-5 h-5 mr-3 text-purple-600" />
+                <div className="bg-purple-50 rounded-2xl p-5 border border-purple-200 shadow-soft">
+                  <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center">
+                    <Database className="w-4 h-4 mr-2.5 text-purple-600" />
                     Data Summary
                   </h3>
-                  <div className="bg-white px-4 py-3 rounded-xl shadow-sm border border-purple-200">
+                  <div className="bg-white px-3.5 py-2.5 rounded-xl shadow-soft border border-purple-200">
                     <div className="prose prose-sm max-w-none text-gray-700">
                       {selectedDatasetInfo.summary.split('\n').map((line, index) => (
                         <div key={index} className="mb-2">
@@ -1628,7 +1724,7 @@ const ChatPage: React.FC = () => {
               )}
 
               {/* Set Active Button */}
-              <div className="sticky bottom-0 bg-white pt-4 border-t border-blue-100">
+              <div className="sticky bottom-0 bg-white pt-4 border-t border-gray-200">
                 <button
                   onClick={async () => {
                     if (currentSession && selectedDatasetInfo) {
@@ -1653,66 +1749,66 @@ const ChatPage: React.FC = () => {
               </div>
             </div>
           ) : files.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="w-20 h-20 bg-blue-100 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-lg">
-                <FileText className="w-10 h-10 text-blue-500" />
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-indigo-100 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-medium">
+                <FileText className="w-8 h-8 text-indigo-500" />
               </div>
-              <h3 className="text-xl font-bold text-gray-700 mb-4">No datasets yet</h3>
+              <h3 className="text-lg font-bold text-gray-800 mb-3">No datasets yet</h3>
               <p className="text-gray-500 text-base leading-relaxed font-medium">
                 Upload your first dataset to start analyzing data with ML Agent
               </p>
             </div>
           ) : (
             <>
-              <div className="text-blue-600 text-sm font-semibold uppercase tracking-wider mb-6 px-3">
+              <div className="text-indigo-600 text-sm font-semibold uppercase tracking-wider mb-4 px-2">
                 Available Datasets
               </div>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {files.map((file, index) => (
                   <div
                     key={file.file_name}
                     className="opacity-0 animate-fade-in"
                     style={{ animationDelay: `${index * 0.05}s`, animationFillMode: 'forwards' }}
                   >
-                    <div className={`group relative p-6 rounded-3xl border-2 transition-all duration-300 overflow-hidden shadow-md hover:shadow-xl ${
+                    <div className={`group relative p-4 rounded-2xl border transition-all duration-300 overflow-hidden shadow-soft hover:shadow-medium ${
                         activeFile?.file_name === file.file_name
-                          ? 'bg-green-50 border-green-300 shadow-md'
-                          : 'bg-white border-blue-100 hover:border-blue-200 hover:shadow-xl hover:bg-blue-50/30 hover:transform hover:scale-[1.02] hover:-translate-y-1'
+                          ? 'bg-indigo-50 border-indigo-300 shadow-medium'
+                          : 'bg-white border-gray-200 hover:border-indigo-200 hover:shadow-strong hover:bg-indigo-50/30 hover:transform hover:scale-[1.02] hover:-translate-y-0.5'
                       }`}
                     >
-                      <div className="flex items-start space-x-5">
-                        <div className={`w-14 h-14 rounded-3xl flex items-center justify-center shadow-lg transition-all duration-300 hover:scale-110 ${
+                      <div className="flex items-start space-x-3">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-soft transition-all duration-300 hover:scale-105 ${
                           activeFile?.file_name === file.file_name 
-                            ? 'bg-green-600 text-white shadow-md' 
-                            : 'bg-blue-100 text-blue-600 group-hover:bg-blue-200 group-hover:text-blue-700'
+                            ? 'bg-indigo-600 text-white shadow-medium' 
+                            : 'bg-indigo-100 text-indigo-600 group-hover:bg-indigo-200 group-hover:text-indigo-700'
                         }`}>
-                          <File className="w-7 h-7" />
+                          <File className="w-5 h-5" />
                         </div>
                         <div 
                           className="flex-1 min-w-0 cursor-pointer"
                           onClick={() => currentSession && setActiveFileForSession(file.file_name || '')}
                         >
-                          <div className="flex items-center space-x-3 mb-2">
-                            <span className="font-bold text-gray-800 truncate text-base">
+                          <div className="flex items-center space-x-2.5 mb-2">
+                            <span className="font-bold text-gray-900 text-sm break-all">
                               {file.file_name}
                             </span>
                             {activeFile?.file_name === file.file_name && (
-                              <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse shadow-md"></div>
+                              <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce-subtle shadow-sm"></div>
                             )}
                           </div>
                           {file.description && (
-                            <p className="text-base text-gray-600 truncate mb-3 leading-6 font-medium">
+                            <p className="text-sm text-gray-600 mb-2.5 leading-5 font-medium line-clamp-2">
                               {file.description}
                             </p>
                           )}
-                          <div className="flex items-center space-x-4 text-sm">
+                          <div className="flex items-center space-x-3 text-xs">
                             {file.size && (
                               <span className="text-gray-500 font-semibold">
                                 {(file.size / 1024 / 1024).toFixed(1)} MB
                               </span>
                             )}
                             {file.upload_time && (
-                              <span className="text-blue-500 font-medium">
+                              <span className="text-indigo-500 font-medium">
                                 {new Date(file.upload_time).toLocaleDateString('en-US', {
                                   month: 'short',
                                   day: 'numeric'
@@ -1721,12 +1817,12 @@ const ChatPage: React.FC = () => {
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-2">
                           {settingActiveFile === file.file_name && (
-                            <div className="w-6 h-6 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin shadow-md"></div>
+                            <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin shadow-sm"></div>
                           )}
                           {loadingDatasetInfo && selectedDatasetInfo?.file_name === file.file_name && (
-                            <div className="w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full animate-spin shadow-md"></div>
+                            <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin shadow-sm"></div>
                           )}
                           <button
                             onClick={(e) => {
@@ -1734,10 +1830,10 @@ const ChatPage: React.FC = () => {
                               getDatasetInfo(file.file_name);
                             }}
                             disabled={loadingDatasetInfo}
-                            className="opacity-0 group-hover:opacity-100 p-2.5 rounded-xl transition-all duration-200 shadow-sm hover:bg-blue-100 hover:text-blue-600 hover:shadow-md hover:scale-110"
+                            className="opacity-0 group-hover:opacity-100 p-2 rounded-2xl transition-all duration-200 shadow-soft hover:bg-indigo-50 hover:text-indigo-600 hover:shadow-medium hover:scale-110"
                             title="View dataset information"
                           >
-                            <Info className="w-5 h-5" />
+                            <Info className="w-4 h-4" />
                           </button>
                           <button
                             onClick={(e) => {
@@ -1745,10 +1841,10 @@ const ChatPage: React.FC = () => {
                               deleteFile(file);
                             }}
                             disabled={activeFile?.file_name === file.file_name}
-                            className={`p-2.5 rounded-xl transition-all duration-200 shadow-sm ${
+                            className={`p-2 rounded-2xl transition-all duration-200 shadow-soft ${
                               activeFile?.file_name === file.file_name
                                 ? 'opacity-30 cursor-not-allowed text-gray-400'
-                                : 'opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-500 hover:shadow-md hover:scale-110'
+                                : 'opacity-0 group-hover:opacity-100 hover:bg-error-50 hover:text-error-500 hover:shadow-medium hover:scale-110'
                             }`}
                             title={activeFile?.file_name === file.file_name ? 'Cannot delete active file' : 'Delete file'}
                           >
