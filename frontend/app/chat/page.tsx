@@ -589,17 +589,20 @@ const ChatPage: React.FC = () => {
             const isExpanded = expandedPythonBlocks.has(codeId);
             
             // For Python code: check if content exceeds limit and handle truncation
-            const shouldLimitPython = isPython && part.content.length > PYTHON_CODE_CHAR_LIMIT;
+            const PYTHON_DISPLAY_LINES = 15; // Fixed number of lines to show
+            const lines = part.content.split('\n');
+            const shouldLimitPython = isPython && lines.length > PYTHON_DISPLAY_LINES;
             let displayContent = part.content;
             
             if (shouldLimitPython && !isExpanded) {
-              if (isStreamingCode) {
-                // During streaming: show newest tokens (truncate from beginning, not end)
-                const startIndex = Math.max(0, part.content.length - PYTHON_CODE_CHAR_LIMIT);
-                displayContent = (startIndex > 0 ? '...' : '') + part.content.substring(startIndex);
-              } else {
-                // Static code: show beginning with "..."
-                displayContent = part.content.substring(0, PYTHON_CODE_CHAR_LIMIT) + '...';
+              if (isStreamingCode && lines.length > PYTHON_DISPLAY_LINES) {
+                // During streaming: show fixed window with newest lines (sliding window)
+                const startIndex = Math.max(0, lines.length - PYTHON_DISPLAY_LINES);
+                const visibleLines = lines.slice(startIndex);
+                displayContent = (startIndex > 0 ? '...\n' : '') + visibleLines.join('\n');
+              } else if (!isStreamingCode && lines.length > PYTHON_DISPLAY_LINES) {
+                // Static code: show first lines with "..."
+                displayContent = lines.slice(0, PYTHON_DISPLAY_LINES).join('\n') + '\n...';
               }
             }
             
@@ -636,13 +639,24 @@ const ChatPage: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {isPython && shouldLimitPython && !isCollapsed && (
+                    {isPython && shouldLimitPython && !isCollapsed && !isExpanded && (
                       <button
                         onClick={() => togglePythonExpansion(codeId)}
                         className="flex items-center space-x-2 px-3 py-1.5 text-blue-300 hover:text-blue-200 hover:bg-gray-700 transition-all duration-200 rounded-xl text-sm font-medium"
-                        title={isExpanded ? "Show less" : "Show full code"}
+                        title="Show full code"
                       >
-                        {isExpanded ? "Show Less" : "Show All"}
+                        <ChevronDown className="w-4 h-4" />
+                        <span>Show More</span>
+                      </button>
+                    )}
+                    {isPython && shouldLimitPython && !isCollapsed && isExpanded && (
+                      <button
+                        onClick={() => togglePythonExpansion(codeId)}
+                        className="flex items-center space-x-2 px-3 py-1.5 text-blue-300 hover:text-blue-200 hover:bg-gray-700 transition-all duration-200 rounded-xl text-sm font-medium"
+                        title="Show less"
+                      >
+                        <ChevronDown className="w-4 h-4 rotate-180" />
+                        <span>Show Less</span>
                       </button>
                     )}
                     {!isStreamingCode && !isCollapsed && (
@@ -666,29 +680,17 @@ const ChatPage: React.FC = () => {
                   </div>
                 </div>
                 {!isCollapsed && (
-                  <div className={`bg-gray-900 border border-gray-700 border-t-0 shadow-soft transition-all duration-300 ${
-                    isPython && shouldLimitPython && isExpanded ? 'rounded-none' : 'rounded-b-2xl'
-                  }`}>
-                    <div className="p-4 overflow-x-auto relative">
-                      <pre className="text-gray-100 text-sm leading-[1.6] font-mono">
+                  <div className="bg-gray-900 border border-gray-700 border-t-0 shadow-soft transition-all duration-300 rounded-b-2xl">
+                    <div className={`p-4 overflow-x-auto relative ${
+                      isPython && shouldLimitPython && !isExpanded ? 'max-h-96 overflow-y-hidden' : ''
+                    }`}>
+                      <pre className="text-gray-100 text-sm leading-[1.6] font-mono whitespace-pre-wrap">
                         <code>{displayContent}</code>
                         {isStreamingCode && (
                           <span className="inline-block w-1.5 h-4 bg-green-400 animate-pulse rounded-sm ml-1 align-text-bottom">▋</span>
                         )}
                       </pre>
                     </div>
-                    {isPython && shouldLimitPython && isExpanded && !isStreamingCode && (
-                      <div className="border-t border-gray-700 p-3 bg-gray-800 rounded-b-2xl flex justify-center">
-                        <button
-                          onClick={() => togglePythonExpansion(codeId)}
-                          className="flex items-center space-x-2 px-4 py-2 text-blue-300 hover:text-blue-200 hover:bg-gray-700 transition-all duration-200 rounded-lg text-sm font-medium"
-                          title="Show less"
-                        >
-                          <ChevronDown className="w-4 h-4 rotate-180" />
-                          <span>Show Less</span>
-                        </button>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
