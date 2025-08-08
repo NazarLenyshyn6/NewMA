@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info, Save } from 'lucide-react';
+import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info, Save, ChevronDown, ChevronRight, Move, Maximize2, Minimize2 } from 'lucide-react';
 import { apiEndpoints } from '@/lib/api';
 
 interface Session {
@@ -59,6 +59,8 @@ const ChatPage: React.FC = () => {
   const [activeFile, setActiveFile] = useState<FileItem | null>(null);
   const [sessionActiveFiles, setSessionActiveFiles] = useState<{[sessionId: string]: string | null}>({});
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [collapsedCodeBlocks, setCollapsedCodeBlocks] = useState<Set<string>>(new Set());
+  const [expandedPythonBlocks, setExpandedPythonBlocks] = useState<Set<string>>(new Set());
   const [streamingMessage, setStreamingMessage] = useState('');
   const [lastChunkTime, setLastChunkTime] = useState<number>(0);
   const [currentStreamingMessageId, setCurrentStreamingMessageId] = useState<string | null>(null);
@@ -78,6 +80,9 @@ const ChatPage: React.FC = () => {
   
   // Debug mode for development - always enabled for streaming debugging
   const DEBUG_STREAMING = true;
+  
+  // Python code display limit (characters)
+  const PYTHON_CODE_CHAR_LIMIT = 500;
 
   // Logout function
   const handleLogout = useCallback(() => {
@@ -134,6 +139,42 @@ const ChatPage: React.FC = () => {
     } catch (err) {
       console.error('Failed to copy code:', err);
     }
+  };
+
+  // Toggle code block collapse state
+  const toggleCodeBlock = (codeId: string) => {
+    setCollapsedCodeBlocks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(codeId)) {
+        newSet.delete(codeId);
+      } else {
+        newSet.add(codeId);
+      }
+      return newSet;
+    });
+  };
+
+  // Auto-collapse new code blocks (start closed)
+  const shouldAutoCollapse = (codeId: string) => {
+    if (!collapsedCodeBlocks.has(codeId)) {
+      // Auto-collapse new code blocks
+      setCollapsedCodeBlocks(prev => new Set([...prev, codeId]));
+      return true;
+    }
+    return collapsedCodeBlocks.has(codeId);
+  };
+
+  // Toggle Python code block expansion
+  const togglePythonExpansion = (codeId: string) => {
+    setExpandedPythonBlocks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(codeId)) {
+        newSet.delete(codeId);
+      } else {
+        newSet.add(codeId);
+      }
+      return newSet;
+    });
   };
 
   // Parse message content to detect code blocks
@@ -493,6 +534,46 @@ const ChatPage: React.FC = () => {
     return processedParts.length > 0 ? processedParts : text;
   };
 
+  // Auto-collapse ALL code blocks by default (always closed everywhere)
+  useEffect(() => {
+    messages.forEach(message => {
+      if (message.role === 'assistant' && message.content) {
+        // Check if this is currently streaming
+        const isCurrentlyStreaming = isLoading && currentStreamingMessageId === message.id;
+        
+        // Use appropriate parser based on streaming state
+        const parts = isCurrentlyStreaming 
+          ? parseStreamingContent(message.content) 
+          : parseMessageContent(message.content);
+          
+        const codeBlockIds = parts
+          .filter(part => part.type === 'code' || part.type === 'streaming-code')
+          .map((part, index) => `${message.id}-${index}`);
+        
+        if (codeBlockIds.length > 0) {
+          setCollapsedCodeBlocks(prev => {
+            const newSet = new Set(prev);
+            let needsUpdate = false;
+            codeBlockIds.forEach(id => {
+              // ALWAYS ensure ALL code blocks are collapsed by default
+              // This applies to: new streaming code, completed code, historical code
+              if (!newSet.has(id)) {
+                newSet.add(id);
+                needsUpdate = true;
+              }
+            });
+            return needsUpdate ? newSet : prev;
+          });
+
+          // Auto-open floating tab ONLY for streaming Python code
+          if (isCurrentlyStreaming) {
+            // All languages now stream normally in main chat (Python included)
+          }
+        }
+      }
+    });
+  }, [messages, isLoading, currentStreamingMessageId]);
+
   // Render message content with code highlighting
   const renderMessageContent = (content: string, messageId: string, isStreaming = false) => {
     const parts = isStreaming ? parseStreamingContent(content) : parseMessageContent(content);
@@ -503,49 +584,113 @@ const ChatPage: React.FC = () => {
           if (part.type === 'code' || part.type === 'streaming-code') {
             const codeId = `${messageId}-${index}`;
             const isStreamingCode = part.type === 'streaming-code';
+            const isCollapsed = collapsedCodeBlocks.has(codeId);
+            const isPython = part.language && part.language.toLowerCase() === 'python';
+            const isExpanded = expandedPythonBlocks.has(codeId);
+            
+            // For Python code: check if content exceeds limit and handle truncation
+            const shouldLimitPython = isPython && part.content.length > PYTHON_CODE_CHAR_LIMIT;
+            let displayContent = part.content;
+            
+            if (shouldLimitPython && !isExpanded) {
+              if (isStreamingCode) {
+                // During streaming: show newest tokens (truncate from beginning, not end)
+                const startIndex = Math.max(0, part.content.length - PYTHON_CODE_CHAR_LIMIT);
+                displayContent = (startIndex > 0 ? '...' : '') + part.content.substring(startIndex);
+              } else {
+                // Static code: show beginning with "..."
+                displayContent = part.content.substring(0, PYTHON_CODE_CHAR_LIMIT) + '...';
+              }
+            }
             
             return (
               <div key={index} className="my-3 first:mt-0 last:mb-0">
                 <div className={`bg-gray-800 rounded-t-2xl px-4 py-2.5 flex items-center justify-between border border-gray-700 shadow-soft ${
                   isStreamingCode ? 'animate-pulse' : ''
-                }`}>
-                  <span className="text-gray-300 text-sm font-mono font-medium">
-                    {part.language}
-                    {isStreamingCode && (
-                      <span className="ml-2 text-green-400 animate-pulse">● streaming</span>
-                    )}
-                  </span>
-                  {!isStreamingCode && (
+                } ${isCollapsed ? 'rounded-b-2xl border-b' : ''}`}>
+                  <div className="flex items-center space-x-3">
                     <button
-                      onClick={() => copyToClipboard(part.content, codeId)}
-                      className="flex items-center space-x-2 px-3 py-1.5 text-gray-300 hover:text-white hover:bg-gray-700 transition-all duration-200 rounded-xl text-sm font-medium shadow-soft hover:shadow-medium"
+                      onClick={() => toggleCodeBlock(codeId)}
+                      className="flex items-center space-x-2 text-gray-300 hover:text-white transition-all duration-200 rounded-lg p-1 hover:bg-gray-700"
+                      title={isCollapsed ? "Expand code" : "Collapse code"}
                     >
-                      {copiedCode === codeId ? (
-                        <>
-                          <Check className="w-4 h-4" />
-                          <span>Copied!</span>
-                        </>
+                      {isCollapsed ? (
+                        <ChevronRight className="w-4 h-4" />
                       ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          <span>Copy</span>
-                        </>
+                        <ChevronDown className="w-4 h-4" />
                       )}
                     </button>
-                  )}
+                    <span className="text-gray-300 text-sm font-mono font-medium">
+                      {part.language}
+                      {isStreamingCode && (
+                        <span className="ml-2 text-green-400 animate-pulse">● streaming</span>
+                      )}
+                      {isCollapsed && (
+                        <span className="ml-2 text-gray-400 text-xs">
+                          ({part.content.split('\n').length} lines)
+                        </span>
+                      )}
+                      {isPython && shouldLimitPython && !isExpanded && (
+                        <span className="ml-2 text-blue-400 text-xs">limited</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {isPython && shouldLimitPython && !isCollapsed && (
+                      <button
+                        onClick={() => togglePythonExpansion(codeId)}
+                        className="flex items-center space-x-2 px-3 py-1.5 text-blue-300 hover:text-blue-200 hover:bg-gray-700 transition-all duration-200 rounded-xl text-sm font-medium"
+                        title={isExpanded ? "Show less" : "Show full code"}
+                      >
+                        {isExpanded ? "Show Less" : "Show All"}
+                      </button>
+                    )}
+                    {!isStreamingCode && !isCollapsed && (
+                      <button
+                        onClick={() => copyToClipboard(part.content, codeId)}
+                        className="flex items-center space-x-2 px-3 py-1.5 text-gray-300 hover:text-white hover:bg-gray-700 transition-all duration-200 rounded-xl text-sm font-medium shadow-soft hover:shadow-medium"
+                      >
+                        {copiedCode === codeId ? (
+                          <>
+                            <Check className="w-4 h-4" />
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-4 h-4" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className={`bg-gray-900 rounded-b-2xl p-4 overflow-x-auto border border-gray-700 border-t-0 shadow-soft ${
-                  isStreamingCode ? 'relative' : ''
-                }`}>
-                  <pre className="text-gray-100 text-sm leading-[1.6] font-mono">
-                    <code>{part.content}</code>
-                  </pre>
-                  {isStreamingCode && (
-                    <div className="absolute bottom-4 right-4">
-                      <div className="inline-block w-2 h-4 bg-green-400 animate-pulse rounded-sm">▋</div>
+                {!isCollapsed && (
+                  <div className={`bg-gray-900 border border-gray-700 border-t-0 shadow-soft transition-all duration-300 ${
+                    isPython && shouldLimitPython && isExpanded ? 'rounded-none' : 'rounded-b-2xl'
+                  }`}>
+                    <div className="p-4 overflow-x-auto relative">
+                      <pre className="text-gray-100 text-sm leading-[1.6] font-mono">
+                        <code>{displayContent}</code>
+                        {isStreamingCode && (
+                          <span className="inline-block w-1.5 h-4 bg-green-400 animate-pulse rounded-sm ml-1 align-text-bottom">▋</span>
+                        )}
+                      </pre>
                     </div>
-                  )}
-                </div>
+                    {isPython && shouldLimitPython && isExpanded && !isStreamingCode && (
+                      <div className="border-t border-gray-700 p-3 bg-gray-800 rounded-b-2xl flex justify-center">
+                        <button
+                          onClick={() => togglePythonExpansion(codeId)}
+                          className="flex items-center space-x-2 px-4 py-2 text-blue-300 hover:text-blue-200 hover:bg-gray-700 transition-all duration-200 rounded-lg text-sm font-medium"
+                          title="Show less"
+                        >
+                          <ChevronDown className="w-4 h-4 rotate-180" />
+                          <span>Show Less</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           } else {
@@ -2459,6 +2604,7 @@ const ChatPage: React.FC = () => {
           </div>
         </div>
       )}
+
       
       {/* Enhanced CSS Animations */}
       <style jsx>{`
