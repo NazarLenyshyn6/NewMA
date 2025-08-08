@@ -585,8 +585,8 @@ const ChatPage: React.FC = () => {
         {logicBlocks.map((blockContent, blockIndex) => (
           <React.Fragment key={blockIndex}>
             {blockIndex > 0 && (
-              <div className="my-8">
-                <div className="h-px bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-60"></div>
+              <div className="my-8 -mx-6">
+                <div className="h-px bg-gray-400 opacity-40"></div>
               </div>
             )}
             {renderMessageContent(blockContent.trim(), `${messageId}-block-${blockIndex}`, isStreaming)}
