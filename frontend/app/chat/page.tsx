@@ -177,6 +177,7 @@ const ChatPage: React.FC = () => {
     });
   };
 
+
   // Parse message content to detect code blocks
   const parseMessageContent = (content: string) => {
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
@@ -574,6 +575,27 @@ const ChatPage: React.FC = () => {
     });
   }, [messages, isLoading, currentStreamingMessageId]);
 
+  // Render entire message content with logic block separators
+  const renderMessageWithSeparators = (content: string, messageId: string, isStreaming = false) => {
+    // First split by ___ to create logic blocks
+    const logicBlocks = content.split(/___+/);
+    
+    return (
+      <div className="prose max-w-none">
+        {logicBlocks.map((blockContent, blockIndex) => (
+          <React.Fragment key={blockIndex}>
+            {blockIndex > 0 && (
+              <div className="my-8">
+                <div className="h-px bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-60"></div>
+              </div>
+            )}
+            {renderMessageContent(blockContent.trim(), `${messageId}-block-${blockIndex}`, isStreaming)}
+          </React.Fragment>
+        ))}
+      </div>
+    );
+  };
+
   // Render message content with code highlighting
   const renderMessageContent = (content: string, messageId: string, isStreaming = false) => {
     const parts = isStreaming ? parseStreamingContent(content) : parseMessageContent(content);
@@ -685,7 +707,9 @@ const ChatPage: React.FC = () => {
                       isPython && shouldLimitPython && !isExpanded ? 'max-h-96 overflow-y-hidden' : ''
                     }`}>
                       <pre className="text-gray-100 text-sm leading-[1.6] font-mono whitespace-pre-wrap">
-                        <code>{displayContent}</code>
+                        <code>
+                          {displayContent}
+                        </code>
                         {isStreamingCode && (
                           <span className="inline-block w-1.5 h-4 bg-green-400 animate-pulse rounded-sm ml-1 align-text-bottom">▋</span>
                         )}
@@ -1939,7 +1963,7 @@ const ChatPage: React.FC = () => {
                       <div className="max-w-2xl">
                         <div className="bg-white text-gray-800 rounded-2xl px-5 py-3.5 shadow-medium hover:shadow-strong transition-all duration-200 border border-gray-200">
                           <div className="text-base leading-relaxed font-medium">
-                            {renderMessageContent(message.content, message.id)}
+                            {renderMessageWithSeparators(message.content, message.id)}
                           </div>
                         </div>
                         <div className="text-xs text-gray-500 mt-2 text-right font-medium">
@@ -1963,7 +1987,7 @@ const ChatPage: React.FC = () => {
                           <div className="text-base leading-[1.7] text-gray-800 font-normal text-left">
                             {message.content ? (
                               <>
-                                {renderMessageContent(message.content, message.id, isLoading && currentStreamingMessageId === message.id)}
+                                {renderMessageWithSeparators(message.content, message.id, isLoading && currentStreamingMessageId === message.id)}
                                 {/* Show typing indicator if this is the currently streaming message */}
                                 {isLoading && currentStreamingMessageId === message.id && (
                                   <span className="inline-block w-1.5 h-5 bg-primary-500 animate-pulse ml-1 rounded-sm">▋</span>
