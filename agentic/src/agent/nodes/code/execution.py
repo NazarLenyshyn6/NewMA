@@ -8,15 +8,19 @@ from uuid import UUID
 import pickle
 
 
+from pydantic import PrivateAttr
 from sqlalchemy.orm import Session
 
 from agent.nodes.base import BaseNode
 from services.memory import agent_memory_service
 from agent.nodes.code.generation import dependencies
+from agent.nodes.code.debagging import code_debagging_node, CodeDebaggingNode
 
 
 class CodeExecutionNode(BaseNode):
     """..."""
+
+    _debagged_token_buffer: list = PrivateAttr()
 
     @staticmethod
     def _import_dependencies(dependencies: List[str]):
@@ -55,6 +59,7 @@ class CodeExecutionNode(BaseNode):
     @override
     async def arun(
         self,
+        question: str,
         code_generation_message: str,
         db: Optional[Session] = None,
         user_id: Optional[int] = None,
@@ -62,8 +67,14 @@ class CodeExecutionNode(BaseNode):
         file_name: Optional[str] = None,
         storage_uri: Optional[str] = None,
         dependencies: List[str] = dependencies,
+        code_debagging_node: CodeDebaggingNode = code_debagging_node,
+        current_attempt: int = 1,
+        max_attempts: int = 5,
     ):
         """..."""
+        if current_attempt > max_attempts:
+            yield "Failed"
+
         persisted_variables_history = pickle.loads(
             self.memory.get_memory(
                 db=db,
@@ -84,10 +95,35 @@ class CodeExecutionNode(BaseNode):
                 for k, v in global_context.items()
                 if k not in dependencies and not isinstance(v, ModuleType)
             }
+            self._token_buffer += code_debagging_node._token_buffer
+            self._debagged_token_buffer = code_debagging_node._token_buffer
             yield local_context
+
         except Exception as e:
-            print("Error is: ", str(e))
-            yield f"Code execution failed with error: {e}"
+            async for chunk in code_debagging_node.arun(
+                code=code,
+                error_message=str(e),
+                dependencies=dependencies,
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+            ):
+                yield chunk
+            fixed_code_generation_message = code_debagging_node.get_steamed_tokens()
+            async for chunk in self.arun(
+                question=question,
+                code_generation_message=fixed_code_generation_message,
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+                dependencies=dependencies,
+                current_attempt=current_attempt + 1,
+            ):
+                yield chunk
 
 
 code_execution_node = CodeExecutionNode(memory=agent_memory_service)

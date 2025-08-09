@@ -92,6 +92,7 @@ class AgentService:
                 yield chunk
             persisted_variables = None
             async for chunk in code_execution_node.arun(
+                question=question,
                 code_generation_message=code_generation_node.get_steamed_tokens(),
                 db=db,
                 user_id=user_id,
@@ -101,10 +102,12 @@ class AgentService:
             ):
                 if isinstance(chunk, dict):
                     persisted_variables = chunk
+                elif chunk == "Failed":
+                    break
                 else:
                     yield chunk
-            analysis_report = persisted_variables.get("analysis_report")
-            if analysis_report is not None:
+            if persisted_variables is not None:
+                analysis_report = persisted_variables.get("analysis_report")
                 async for chunk in techical_response_node.arun(
                     question=question,
                     analysis_report=analysis_report,
@@ -115,6 +118,7 @@ class AgentService:
                     storage_uri=storage_uri,
                 ):
                     yield chunk
+
                 summary = parallel_summarization_node.run(
                     db=db,
                     user_id=user_id,
@@ -139,7 +143,8 @@ class AgentService:
                 )
 
             else:
-                yield "Code execution failed"
+                yield "Unexptexted error happend, try again."
+
             new_conversation = [
                 {
                     "question": question,
