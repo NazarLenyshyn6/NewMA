@@ -73,6 +73,7 @@ class CodeExecutionNode(BaseNode):
     ):
         """..."""
         if current_attempt > max_attempts:
+            code_debagging_node._token_buffer = []
             yield "Failed"
 
         persisted_variables_history = pickle.loads(
@@ -97,10 +98,12 @@ class CodeExecutionNode(BaseNode):
             }
             self._token_buffer += code_debagging_node._token_buffer
             self._debagged_token_buffer = code_debagging_node._token_buffer
+            code_debagging_node._token_buffer = []
             yield local_context
 
         except Exception as e:
             async for chunk in code_debagging_node.arun(
+                question=question,
                 code=code,
                 error_message=str(e),
                 dependencies=dependencies,

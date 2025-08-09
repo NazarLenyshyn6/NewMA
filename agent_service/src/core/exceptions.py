@@ -1,7 +1,0 @@
-"""..."""
-
-
-class ChatHistoryNotFound(Exception):
-    """..."""
-
-    ...

@@ -81,6 +81,7 @@ class AgentService:
             ):
                 yield chunk
             async for chunk in code_generation_node.arun(
+                question=question,
                 instruction=planning_node.get_steamed_tokens(),
                 dataset_summary=dataset_summary,
                 db=db,
