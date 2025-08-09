@@ -47,16 +47,22 @@ class AgentMemoryRepository:
         memory_history = cls.get_memory(
             db=db, user_id=user_id, session_id=session_id, file_name=file_name
         )
-        updatable_variables = [
-            "conversation_context",
-            "conversation_history",
-            "code_context",
-            "persisted_variables",
-        ]
-        for field in updatable_variables:
-            new_value = getattr(memory_history, field, None)
-            if new_value is not None:
-                setattr(memory_history, field, new_value)
+
+        if memory_schema.conversation_history is not None:
+            print("Conversation history")
+            memory_history.conversation_history = memory_schema.conversation_history
+
+        if memory_schema.conversation_context is not None:
+            print("Conversation context")
+            memory_history.conversation_context = memory_schema.conversation_context
+
+        if memory_schema.code_context is not None:
+            print("Code context")
+            memory_history.code_context = memory_schema.code_context
+
+        if memory_schema.conversation_context is not None:
+            print("Variables")
+            memory_history.persisted_variables = memory_schema.persisted_variables
 
         db.commit()
 

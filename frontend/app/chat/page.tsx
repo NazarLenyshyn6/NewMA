@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info, Save, ChevronDown, ChevronRight, Move, Maximize2, Minimize2 } from 'lucide-react';
+import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info, Save, ChevronDown, ChevronRight, Move, Maximize2, Minimize2, RefreshCw } from 'lucide-react';
 import { apiEndpoints } from '@/lib/api';
 
 interface Session {
@@ -59,6 +59,7 @@ const ChatPage: React.FC = () => {
   const [activeFile, setActiveFile] = useState<FileItem | null>(null);
   const [sessionActiveFiles, setSessionActiveFiles] = useState<{[sessionId: string]: string | null}>({});
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [copiedMessage, setCopiedMessage] = useState<string | null>(null);
   const [collapsedCodeBlocks, setCollapsedCodeBlocks] = useState<Set<string>>(new Set());
   const [expandedPythonBlocks, setExpandedPythonBlocks] = useState<Set<string>>(new Set());
   const [streamingMessage, setStreamingMessage] = useState('');
@@ -141,6 +142,179 @@ const ChatPage: React.FC = () => {
     }
   };
 
+  // Copy entire message to clipboard
+  const copyMessageToClipboard = async (content: string, messageId: string) => {
+    try {
+      // Clean the content by removing markdown formatting for plain text copy
+      const cleanContent = content
+        .replace(/```[\w]*\n/g, '') // Remove code block markers
+        .replace(/```/g, '') // Remove closing code block markers
+        .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold formatting
+        .replace(/_(.*?)_/g, '$1') // Remove italic formatting
+        .replace(/#{1,6}\s/g, '') // Remove header markers
+        .replace(/___+/g, '\n---\n'); // Convert separators to simple lines
+      
+      await navigator.clipboard.writeText(cleanContent);
+      setCopiedMessage(messageId);
+      setTimeout(() => setCopiedMessage(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy message:', err);
+    }
+  };
+
+  // Resend the last user question
+  const resendLastQuestion = async () => {
+    if (isLoading) return; // Don't allow if already loading
+    
+    // Find the last user message
+    const lastUserMessage = [...messages].reverse().find(msg => msg.role === 'user');
+    if (!lastUserMessage || !lastUserMessage.content.trim()) return;
+
+    // Create a new user message with the same content
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: lastUserMessage.content,
+      role: 'user',
+      timestamp: new Date().toISOString(),
+    };
+
+    // Add the user message to the conversation
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+    setStreamingMessage('');
+
+    // Create initial assistant message for streaming
+    const assistantMessageId = (Date.now() + 1).toString();
+    const initialAssistantMessage: Message = {
+      id: assistantMessageId,
+      content: '',
+      role: 'assistant',
+      timestamp: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, initialAssistantMessage]);
+
+    // Send the message using the same logic as handleSendMessage
+    try {
+      console.log('🔄 Resending question:', lastUserMessage.content.substring(0, 50) + '...');
+      
+      // Try streaming endpoint
+      let response = await fetch(`http://localhost:8003/api/v1/gateway/chat/stream?question=${encodeURIComponent(lastUserMessage.content)}`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      // If that fails, try with trailing slash
+      if (!response.ok && (response.status === 404 || response.status === 405)) {
+        response = await fetch(`http://localhost:8003/api/v1/gateway/chat/stream/?question=${encodeURIComponent(lastUserMessage.content)}`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+        });
+      }
+
+      if (handleAuthError(response)) {
+        setIsLoading(false);
+        return;
+      }
+
+      if (response.ok && response.body) {
+        // Handle streaming response (same logic as in handleSendMessage)
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let currentMessageId = assistantMessageId;
+        let currentContent = '';
+        
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              setCurrentStreamingMessageId(null);
+              // Auto-collapse Python code blocks when execution finishes
+              setExpandedPythonBlocks(new Set());
+              setTimeout(() => {
+                setCollapsedCodeBlocks(prev => {
+                  const newSet = new Set(prev);
+                  if (currentContent.includes('```python')) {
+                    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+                    let match;
+                    let blockIndex = 0;
+                    while ((match = codeBlockRegex.exec(currentContent)) !== null) {
+                      if (match[1] && match[1].toLowerCase() === 'python') {
+                        const codeId = `${currentMessageId}-${blockIndex}`;
+                        newSet.add(codeId);
+                      }
+                      blockIndex++;
+                    }
+                  }
+                  return newSet;
+                });
+              }, 100);
+              break;
+            }
+
+            const chunk = decoder.decode(value, { stream: true });
+            currentContent += chunk;
+            
+            // Update the single assistant message in real-time
+            setMessages(prev => prev.map(msg => 
+              msg.id === currentMessageId 
+                ? { ...msg, content: currentContent }
+                : msg
+            ));
+            
+            setCurrentStreamingMessageId(currentMessageId);
+          }
+        } catch (readError) {
+          console.error('❌ Error reading stream:', readError);
+          throw readError;
+        }
+      } else {
+        // Fallback to regular chat endpoint
+        let fallbackResponse = await fetch(`http://localhost:8003/api/v1/gateway/chat?question=${encodeURIComponent(lastUserMessage.content)}`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+        });
+
+        if (!fallbackResponse.ok && (fallbackResponse.status === 404 || fallbackResponse.status === 405)) {
+          fallbackResponse = await fetch(`http://localhost:8003/api/v1/gateway/chat/?question=${encodeURIComponent(lastUserMessage.content)}`, {
+            method: 'GET',
+            headers: getAuthHeaders(),
+          });
+        }
+
+        if (fallbackResponse.ok) {
+          const contentType = fallbackResponse.headers.get('content-type');
+          let content;
+          
+          if (contentType && contentType.includes('application/json')) {
+            const data = await fallbackResponse.json();
+            content = data.response || data.message || data.answer || JSON.stringify(data);
+          } else {
+            content = await fallbackResponse.text();
+          }
+          
+          setMessages(prev => prev.map(msg => 
+            msg.id === assistantMessageId 
+              ? { ...msg, content: content || 'No response received' }
+              : msg
+          ));
+        } else {
+          throw new Error('Failed to get response');
+        }
+      }
+    } catch (error) {
+      console.error('Error resending message:', error);
+      setMessages(prev => prev.map(msg => 
+        msg.id === assistantMessageId 
+          ? { ...msg, content: 'Sorry, I encountered an error. Please try again.' }
+          : msg
+      ));
+    } finally {
+      setIsLoading(false);
+      setStreamingMessage('');
+      setCurrentStreamingMessageId(null);
+    }
+  };
+
   // Toggle code block collapse state
   const toggleCodeBlock = (codeId: string) => {
     setCollapsedCodeBlocks(prev => {
@@ -178,7 +352,7 @@ const ChatPage: React.FC = () => {
   };
 
 
-  // Parse message content to detect code blocks
+  // Parse message content to detect code blocks - ONLY Python gets special treatment
   const parseMessageContent = (content: string) => {
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
     const parts = [];
@@ -193,11 +367,21 @@ const ChatPage: React.FC = () => {
         });
       }
 
-      parts.push({
-        type: 'code',
-        language: match[1] || 'text',
-        content: match[2].trim()
-      });
+      // Only treat as special code block if it's explicitly Python
+      const language = match[1] || '';
+      if (language.toLowerCase() === 'python') {
+        parts.push({
+          type: 'code',
+          language: 'python',
+          content: match[2].trim()
+        });
+      } else {
+        // Treat non-Python code blocks as regular text (just remove the ``` markers)
+        parts.push({
+          type: 'text',
+          content: match[2].trim()
+        });
+      }
 
       lastIndex = match.index + match[0].length;
     }
@@ -248,20 +432,40 @@ const ChatPage: React.FC = () => {
       if (codeEndMatch) {
         // Complete code block found
         const codeContent = remainingContent.slice(0, codeEndMatch[0].length - 3).replace(/^\n/, '');
-        parts.push({
-          type: 'code',
-          language: language,
-          content: codeContent
-        });
+        
+        // Only treat as special code block if it's explicitly Python
+        if (language.toLowerCase() === 'python') {
+          parts.push({
+            type: 'code',
+            language: 'python',
+            content: codeContent
+          });
+        } else {
+          // Treat non-Python code blocks as regular text (just remove the ``` markers)
+          parts.push({
+            type: 'text',
+            content: codeContent
+          });
+        }
         currentIndex = codeStart + match[0].length + codeEndMatch[0].length;
       } else {
         // Incomplete code block (still streaming)
         const codeContent = remainingContent.replace(/^\n/, '');
-        parts.push({
-          type: 'streaming-code',
-          language: language,
-          content: codeContent
-        });
+        
+        // Only treat as special streaming code block if it's explicitly Python
+        if (language.toLowerCase() === 'python') {
+          parts.push({
+            type: 'streaming-code',
+            language: 'python',
+            content: codeContent
+          });
+        } else {
+          // Treat non-Python code blocks as regular text (just remove the ``` markers)
+          parts.push({
+            type: 'text',
+            content: codeContent
+          });
+        }
         currentIndex = normalizedContent.length;
         break;
       }
@@ -710,9 +914,6 @@ const ChatPage: React.FC = () => {
                         <code>
                           {displayContent}
                         </code>
-                        {isStreamingCode && (
-                          <span className="inline-block w-1.5 h-4 bg-green-400 animate-pulse rounded-sm ml-1 align-text-bottom">▋</span>
-                        )}
                       </pre>
                     </div>
                   </div>
@@ -1530,65 +1731,15 @@ const ChatPage: React.FC = () => {
               console.log(`📦 Chunk ${chunkCount}:`, JSON.stringify(chunk));
             }
             
-            // Check if chunk contains ✅ (new message separator)
-            const containsCheckmark = chunk.includes('✅');
-            
-            if (DEBUG_STREAMING) {
-              console.log(`📦 Chunk ${chunkCount}:`, JSON.stringify(chunk));
-              if (containsCheckmark) {
-                console.log(`✅ CHECKMARK DETECTED! Will create new message wrapper`);
-              }
-            }
-            
-            // If chunk contains ✅, split the content and create new message
-            if (containsCheckmark) {
-              // Split content at ✅ 
-              const parts = chunk.split('✅');
-              const beforeCheckmark = parts[0];
-              const afterCheckmark = parts.slice(1).join('✅'); // In case multiple ✅
+            // Continue building current message - no more message splitting
+            currentContent += chunk;
               
-              // Add content before ✅ to current message (including the ✅)
-              currentContent += beforeCheckmark + '✅';
-              
-              // Update current message with content up to ✅
-              setMessages(prev => prev.map(msg => 
-                msg.id === currentMessageId 
-                  ? { ...msg, content: currentContent }
-                  : msg
-              ));
-              
-              console.log(`🔄 CREATING NEW MESSAGE WRAPPER after ✅`);
-              console.log(`📝 Previous message finalized with: "${currentContent}"`);
-              
-              // Create completely new assistant message wrapper
-              const newMessageId = `${Date.now()}-${Math.random()}`;
-              const newMessage: Message = {
-                id: newMessageId,
-                content: afterCheckmark, // Start new message with content after ✅
-                role: 'assistant',
-                timestamp: new Date().toISOString(),
-              };
-              
-              console.log(`✨ Created new message with ID: ${newMessageId}`);
-              console.log(`📝 New message starts with: "${afterCheckmark}"`);
-              
-              // Add the new message to the conversation
-              setMessages(prev => [...prev, newMessage]);
-              
-              // Switch to streaming into the new message
-              currentMessageId = newMessageId;
-              currentContent = afterCheckmark; // Reset content tracking for new message
-            } else {
-              // Continue building current message (no ✅ found)
-              currentContent += chunk;
-              
-              // Update the current assistant message in real-time
-              setMessages(prev => prev.map(msg => 
-                msg.id === currentMessageId 
-                  ? { ...msg, content: currentContent }
-                  : msg
-              ));
-            }
+            // Update the current assistant message in real-time
+            setMessages(prev => prev.map(msg => 
+              msg.id === currentMessageId 
+                ? { ...msg, content: currentContent }
+                : msg
+            ));
             
             fullContent += chunk;
             setCurrentStreamingMessageId(currentMessageId);
@@ -2033,46 +2184,91 @@ const ChatPage: React.FC = () => {
                   {/* AI response - floating with light borders */}
                   {message.role === 'assistant' && (
                     <div className="flex justify-start mb-8">
-                      <div className="max-w-4xl w-full">
-                        {/* Top border - more visible */}
-                        <div className="h-0.5 bg-gradient-to-r from-transparent via-blue-400/80 to-transparent mb-4 mt-2"></div>
+                      <div className="max-w-4xl w-full group">
                         
                         <div className="px-6 py-3">
                           <div className="text-base leading-[1.7] text-gray-800 font-normal text-left">
                             {message.content ? (
                               <>
                                 {renderMessageWithSeparators(message.content, message.id, isLoading && currentStreamingMessageId === message.id)}
-                                {/* Show typing indicator if this is the currently streaming message */}
-                                {isLoading && currentStreamingMessageId === message.id && (
-                                  <span className="inline-block w-1.5 h-5 bg-primary-500 animate-pulse ml-1 rounded-sm">▋</span>
-                                )}
                               </>
                             ) : (
-                              /* Loading state for empty assistant message */
-                              <div className="flex items-center justify-center gap-4 text-gray-600">
-                                <div className="flex gap-1">
-                                  <div className="w-2.5 h-2.5 bg-primary-400 rounded-full animate-bounce"></div>
-                                  <div className="w-2.5 h-2.5 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                                  <div className="w-2.5 h-2.5 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                                </div>
-                                <span className="text-base font-medium">Analyzing your data and preparing insights...</span>
+                              /* Loading state - single bold dot */
+                              <div className="flex items-center">
+                                <div className="w-2 h-2 bg-gray-600 rounded-full animate-pulse"></div>
                               </div>
                             )}
                           </div>
                         </div>
                         
-                        <div className="text-xs text-gray-400 text-left font-medium ml-6">
-                          {new Date(message.timestamp).toLocaleTimeString('en-US', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                          {/* Show AI is responding indicator only for currently streaming message */}
-                          {isLoading && currentStreamingMessageId === message.id && (
-                            <>
-                              <span className="mx-2">•</span>
-                              <span className="text-green-500">AI is responding...</span>
-                            </>
-                          )}
+                        <div className="flex justify-between items-center ml-6 mt-3">
+                          <div className="flex items-center space-x-3">
+                            {/* Action buttons - only show when message is complete (not streaming) */}
+                            {message.content && !(isLoading && currentStreamingMessageId === message.id) && (
+                              <div className="flex items-center space-x-2">
+                                {/* Copy message button */}
+                                <button
+                                  onClick={() => copyMessageToClipboard(message.content, message.id)}
+                                  className={`relative group/btn flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ease-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400/30 ${
+                                    copiedMessage === message.id 
+                                      ? 'bg-green-50 text-green-600 border border-green-200 shadow-sm' 
+                                      : 'bg-gray-50/80 text-gray-500 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md border border-gray-200/60'
+                                  }`}
+                                  title="Copy message"
+                                >
+                                  <div className="relative">
+                                    {copiedMessage === message.id ? (
+                                      <Check className="w-4 h-4 transition-all duration-200" />
+                                    ) : (
+                                      <Copy className="w-4 h-4 transition-all duration-200 group-hover/btn:scale-110" />
+                                    )}
+                                  </div>
+                                  
+                                  {/* Tooltip */}
+                                  <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover/btn:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                                    {copiedMessage === message.id ? 'Copied!' : 'Copy message'}
+                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                                  </div>
+                                </button>
+                                
+                                {/* Reload/resend button */}
+                                <button
+                                  onClick={resendLastQuestion}
+                                  className={`relative group/btn flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 ease-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400/30 ${
+                                    isLoading 
+                                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' 
+                                      : 'bg-gray-50/80 text-gray-500 hover:bg-gray-100 hover:text-gray-700 hover:shadow-md border border-gray-200/60'
+                                  }`}
+                                  title="Resend last question"
+                                  disabled={isLoading}
+                                >
+                                  <div className="relative">
+                                    <RefreshCw className={`w-4 h-4 transition-all duration-200 ${isLoading ? '' : 'group-hover/btn:scale-110 group-hover/btn:rotate-12'}`} />
+                                  </div>
+                                  
+                                  {/* Tooltip */}
+                                  <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover/btn:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                                    {isLoading ? 'Please wait...' : 'Resend question'}
+                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                                  </div>
+                                </button>
+                              </div>
+                            )}
+                            
+                            <div className="text-xs text-gray-400 font-medium ml-1">
+                              {new Date(message.timestamp).toLocaleTimeString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                              {/* Show AI is responding indicator only for currently streaming message */}
+                              {isLoading && currentStreamingMessageId === message.id && (
+                                <>
+                                  <span className="mx-2">•</span>
+                                  <span className="text-green-500 animate-pulse">AI is responding...</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>

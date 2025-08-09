@@ -134,16 +134,17 @@ class AgentMemoryService:
         )
 
         # Update chat history
-        updatable_variables = [
-            "conversation_context",
-            "conversation_history",
-            "code_context",
-            "persisted_variables",
-        ]
-        for field in updatable_variables:
-            new_value = getattr(memory_history, field, None)
-            if new_value is not None:
-                setattr(memory_history, field, new_value)
+        if conversation_context is not None:
+            memory_history.conversation_context = conversation_context
+
+        if conversation_history is not None:
+            memory_history.conversation_history = conversation_history
+
+        if code_context is not None:
+            memory_history.code_context = code_context
+
+        if persisted_variables is not None:
+            memory_history.persisted_variables = persisted_variables
 
         # Cache updated chat history
         self.agent_memory_cache_manager.cache_memory(
@@ -160,7 +161,7 @@ class AgentMemoryService:
             session_id=session_id, file_name=file_name
         )
 
-        if cached_memory:
+        if cached_memory is not None:
             AgentMemoryRepository.update_memory(
                 db=db,
                 user_id=user_id,

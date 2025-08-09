@@ -1,12 +1,12 @@
 """..."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, Optional, List
 from uuid import UUID
 
 from pydantic import BaseModel, PrivateAttr, ConfigDict
 from sqlalchemy.orm import Session
-from langchain_core.runnables import Runnable
+from langchain_core.runnables import Runnable, RunnableParallel
 from langchain.prompts import ChatPromptTemplate
 
 from services.memory import AgentMemoryService
@@ -60,3 +60,26 @@ class BaseNode(BaseModel, ABC):
 
     def get_steamed_tokens(self) -> str:
         return "".join(self._token_buffer)
+
+
+class BaseParallelNode(BaseModel):
+    """..."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    model: Runnable
+    memory: AgentMemoryService
+
+    @abstractmethod
+    def run(
+        self,
+        db: Optional[Session] = None,
+        user_id: Optional[int] = None,
+        session_id: Optional[UUID] = None,
+        file_name: Optional[str] = None,
+        storage_uri: Optional[str] = None,
+        *args,
+        **kwargs
+    ):
+        """..."""
+        ...
