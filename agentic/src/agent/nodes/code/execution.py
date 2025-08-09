@@ -86,6 +86,7 @@ class CodeExecutionNode(BaseNode):
             }
             yield local_context
         except Exception as e:
+            print("Error is: ", str(e))
             yield f"Code execution failed with error: {e}"
 
 

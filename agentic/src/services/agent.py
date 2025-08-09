@@ -10,6 +10,7 @@ from agent.nodes.planning import planning_node
 from agent.nodes.code.generation import code_generation_node
 from agent.nodes.code.execution import code_execution_node
 from agent.nodes.responses.techical import techical_response_node
+from services.memory import agent_memory_service
 
 
 class AgentService:
@@ -89,6 +90,40 @@ class AgentService:
                     storage_uri=storage_uri,
                 ):
                     yield chunk
+                conversation_history = agent_memory_service.get_conversation_memory(
+                    db=db,
+                    user_id=user_id,
+                    session_id=session_id,
+                    file_name=file_name,
+                    storage_uri=storage_uri,
+                )
+                agent_memory_service.update_memory_cache(
+                    db=db,
+                    user_id=user_id,
+                    session_id=session_id,
+                    file_name=file_name,
+                    storage_uri=storage_uri,
+                    conversation_history=conversation_history
+                    + [
+                        {
+                            "question": question,
+                            "answer": planning_node.get_steamed_tokens()
+                            + code_generation_node.get_steamed_tokens()
+                            + techical_response_node.get_steamed_tokens(),
+                        }
+                    ],
+                )
+                print(
+                    conversation_history
+                    + [
+                        {
+                            "question": question,
+                            "answer": planning_node.get_steamed_tokens()
+                            + code_generation_node.get_steamed_tokens()
+                            + techical_response_node.get_steamed_tokens(),
+                        }
+                    ],
+                )
 
             else:
                 yield "Code execution failed"

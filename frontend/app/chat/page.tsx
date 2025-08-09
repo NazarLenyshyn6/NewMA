@@ -776,7 +776,11 @@ const ChatPage: React.FC = () => {
         const testChatHistory = [
           {
             "question": "check data types",
-            "answer": "DATA TYPE OPTIMIZATION ANALYSIS SUMMARY\n\nOVERVIEW:\nAnalyzed 11 columns in a hypertension dataset to optimize data types for improved analysis performance and memory efficiency.\n\nKEY FINDINGS:\n- 6 out of 11 columns are using suboptimal data types, all stored as generic \"object\" types instead of specialized categorical formats\n- All numeric data (Age, Salt Intake, Stress Score, Sleep Duration, BMI) is clean with no missing values or data quality issues\n- 3 columns contain simple yes/no data that can be converted to efficient boolean types\n- No mixed data types or corrupted entries detected - dataset is structurally sound\n\nRECOMMENDED OPTIMIZATIONS:\n1. Convert 5 categorical columns (BP History, Medication, Family History, Exercise Level, Smoking Status) from object to category type for better memory usage and analysis capabilities\n2. Convert 1 target column (Has Hypertension) to boolean for logical operations\n3. Keep numeric columns as-is - they are properly formatted\n\nBUSINESS IMPACT:\n- Improved memory efficiency for larger datasets\n- Faster analysis and modeling operations\n- Better data integrity for machine learning workflows\n- Enhanced categorical analysis capabilities for health risk factors\n\nNEXT STEPS:\nImplement the 6 recommended data type conversions to prepare the dataset for advanced analytics and predictive modeling. The clean data quality means conversions can proceed without additional data cleaning steps."
+            "answer": "I'll help you check the data types in your dataset. This is a fundamental step in understanding your data structure and ensuring proper analysis.\n\nHere's how to examine the data types systematically:\n\n**Step 1: Get Overall Data Type Summary**\nUse the `.dtypes` attribute to display all column data types at once. This gives you a quick overview of what you're working with - whether columns are integers, floats, objects (strings), booleans, or datetime types.\n\n___\n\n**Step 2: Get Detailed Information**\nUse the `.info()` method to get comprehensive details including:\n- Column names and their positions\n- Non-null count for each column\n- Data type for each column  \n- Memory usage of the dataset\n- Total number of entries\n\n```python\nimport pandas as pd\nimport numpy as np\n\n# Step 1: Get Overall Data Type Summary\ndtypes_summary = df.dtypes\nprint(\"Data Types Overview:\")\nprint(dtypes_summary)\n\n# Step 2: Get Detailed Information\nprint(\"\\nDetailed Dataset Information:\")\ndf.info(memory_usage='deep')\n```\n\n# Data Types Analysis: Technical Deep Dive\n\n## **Dataset Structure Overview**\n\nThe analysis reveals a **Netflix-style streaming dataset** with 200 entries across 12 columns, consuming approximately 188KB of memory. The data structure is heavily skewed toward textual content, with **11 object-type columns** and only **1 integer column** (`release_year`).\n\n**Memory footprint**: ~940 bytes per row, which suggests room for optimization through strategic type conversions."
+          },
+          {
+            "question": "show me the first 5 rows",
+            "answer": "I'll display the first 5 rows of your dataset to give you a quick overview of the data structure and content.\n\n```python\n# Display first 5 rows\nfirst_5_rows = df.head(5)\nprint(\"First 5 rows of the dataset:\")\nprint(first_5_rows)\n```\n\nHere are the first 5 rows of your dataset:\n\n| show_id | type | title | director | cast | country |\n|---------|------|--------|----------|------|----------|\n| s1 | Movie | Dick Johnson Is Dead | Kirsten Johnson | NaN | United States |\n| s2 | Movie | Blood & Water | NaN | Ama Qamata, Khosi Ngema | South Africa |\n| s3 | TV Show | Ganglands | Julien Leclercq | Sami Bouajila, Tracy Gotoas | NaN |\n| s4 | TV Show | Jailbirds New Orleans | NaN | NaN | NaN |\n| s5 | Movie | Kota Factory | NaN | Mayur More, Jitendra Kumar | India |\n\nThis gives you a clear view of:\n- **Content types**: Mix of Movies and TV Shows\n- **Missing values**: Several NaN entries in director, cast, and country columns\n- **Data variety**: International content from multiple countries\n- **Text-heavy content**: Rich metadata with titles, names, and descriptions"
           }
         ];
         console.log('🧪 TEST MODE: Using sample chat history');
@@ -829,17 +833,41 @@ const ChatPage: React.FC = () => {
         const chatHistory: ChatHistoryItem[] = await response.json();
         console.log('📖 Raw chat history response:', JSON.stringify(chatHistory, null, 2));
         
-        if (chatHistory && chatHistory.length > 0) {
+        // Validate that the response is an array of objects with question/answer format
+        if (chatHistory && Array.isArray(chatHistory) && chatHistory.length > 0) {
+          // Validate each item has the expected format
+          const isValidFormat = chatHistory.every(item => 
+            item && 
+            typeof item === 'object' && 
+            typeof item.question === 'string' && 
+            typeof item.answer === 'string'
+          );
+          
+          if (!isValidFormat) {
+            console.warn('⚠️ Backend response format validation failed - some items missing question/answer fields');
+            console.log('📋 Expected: [{"question": "...", "answer": "..."}]');
+            console.log('📋 Received:', chatHistory);
+          }
           // Convert chat history to dialog format: questions on RIGHT (user), answers on LEFT (assistant)
           const messages: Message[] = [];
           chatHistory.forEach((item, index) => {
+            // Skip invalid items but continue processing
+            if (!item || typeof item.question !== 'string' || typeof item.answer !== 'string') {
+              console.warn(`⚠️ Skipping invalid chat history item at index ${index}:`, item);
+              return;
+            }
+            
             const baseId = Date.now() + index * 2;
             const currentTime = new Date();
+            
+            // Clean up escaped quotes and normalize content
+            const cleanQuestion = item.question.replace(/\\'/g, "'").replace(/\\"/g, '"');
+            const cleanAnswer = item.answer.replace(/\\'/g, "'").replace(/\\"/g, '"');
             
             // Add user question (will appear on RIGHT side)
             messages.push({
               id: `${baseId}`,
-              content: item.question,
+              content: cleanQuestion,
               role: 'user',
               timestamp: new Date(currentTime.getTime() + index * 2).toISOString(),
             });
@@ -847,7 +875,7 @@ const ChatPage: React.FC = () => {
             // Add assistant answer (will appear on LEFT side)
             messages.push({
               id: `${baseId + 1}`,
-              content: item.answer,
+              content: cleanAnswer,
               role: 'assistant',
               timestamp: new Date(currentTime.getTime() + index * 2 + 1).toISOString(),
             });
@@ -860,6 +888,7 @@ const ChatPage: React.FC = () => {
           console.log(`📁 Chat history loaded for file: ${activeFileName}`);
         } else {
           console.log('📝 No previous conversation history found - showing empty chat (like new session)');
+          console.log('📋 Response data was:', chatHistory);
           setMessages([]);
         }
       } else {
@@ -1464,6 +1493,31 @@ const ChatPage: React.FC = () => {
             if (done) {
               console.log(`✅ Streaming completed. Total chunks: ${chunkCount}, Final content length: ${fullContent.length}`);
               setCurrentStreamingMessageId(null);
+              
+              // Auto-collapse all Python code blocks when execution finishes
+              setExpandedPythonBlocks(new Set());
+              
+              // Use a timeout to ensure the final message updates are processed
+              setTimeout(() => {
+                setCollapsedCodeBlocks(prev => {
+                  const newSet = new Set(prev);
+                  // Find all Python code blocks in the final content and collapse them
+                  if (currentContent.includes('```python')) {
+                    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+                    let match;
+                    let blockIndex = 0;
+                    while ((match = codeBlockRegex.exec(currentContent)) !== null) {
+                      if (match[1] && match[1].toLowerCase() === 'python') {
+                        const codeId = `${currentMessageId}-${blockIndex}`;
+                        newSet.add(codeId);
+                      }
+                      blockIndex++;
+                    }
+                  }
+                  return newSet;
+                });
+              }, 100); // Small delay to ensure message state is updated
+              
               break;
             }
 
@@ -1955,7 +2009,7 @@ const ChatPage: React.FC = () => {
             </div>
           ) : (
             <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
-              {messages.map((message, index) => (
+              {messages.map((message) => (
                 <div key={message.id}>
                   {/* User message - standalone, aligned right */}
                   {message.role === 'user' && (
