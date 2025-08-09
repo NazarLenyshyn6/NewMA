@@ -9,6 +9,7 @@ from agent.nodes.responses.contextual import contextual_response_node
 from agent.nodes.planning import planning_node
 from agent.nodes.code.generation import code_generation_node
 from agent.nodes.code.execution import code_execution_node
+from agent.nodes.responses.techical import techical_response_node
 
 
 class AgentService:
@@ -63,6 +64,7 @@ class AgentService:
                 storage_uri=storage_uri,
             ):
                 yield chunk
+            persisted_variables = None
             async for chunk in code_execution_node.arun(
                 code_generation_message=code_generation_node.get_steamed_tokens(),
                 db=db,
@@ -71,4 +73,22 @@ class AgentService:
                 file_name=file_name,
                 storage_uri=storage_uri,
             ):
-                yield f"{chunk}"
+                if isinstance(chunk, dict):
+                    persisted_variables = chunk
+                else:
+                    yield chunk
+            analysis_report = persisted_variables.get("analysis_report")
+            if analysis_report is not None:
+                async for chunk in techical_response_node.arun(
+                    question=question,
+                    analysis_report=analysis_report,
+                    db=db,
+                    user_id=user_id,
+                    session_id=session_id,
+                    file_name=file_name,
+                    storage_uri=storage_uri,
+                ):
+                    yield chunk
+
+            else:
+                yield "Code execution failed"

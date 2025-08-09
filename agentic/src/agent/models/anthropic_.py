@@ -20,6 +20,14 @@ contextual_response_model = ChatAnthropic(
     streaming=True,
 )
 
+techical_response_model = ChatAnthropic(
+    model_name="claude-sonnet-4-20250514",
+    anthropic_api_key=settings.anthropic_model.ANTHROPIC_API_KEY,
+    temperature=0.5,
+    max_tokens=8000,
+    streaming=True,
+)
+
 
 desicion_model = ChatAnthropic(
     model_name="claude-sonnet-4-20250514",
