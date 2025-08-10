@@ -43,44 +43,10 @@ class CodeExecutionNode(BaseNode):
         if not match:
             return None
 
-        return match.group(1).strip()
-
-    def _execute(
-        self,
-        question: str,
-        code_generation_message: str,
-        db: Optional[Session] = None,
-        user_id: Optional[int] = None,
-        session_id: Optional[UUID] = None,
-        file_name: Optional[str] = None,
-        storage_uri: Optional[str] = None,
-        dependencies: List[str] = dependencies,
-    ):
-        persisted_variables_history = pickle.loads(
-            self.memory.get_memory(
-                db=db,
-                user_id=user_id,
-                session_id=session_id,
-                file_name=file_name,
-                storage_uri=storage_uri,
-            ).persisted_variables
-        )
-        code = self._extract_code(code_generation_message)
-        global_context = self._import_dependencies(dependencies)
-        local_context = persisted_variables_history.copy()
-        global_context.update(local_context)
-        try:
-            print("-" * 25)
-            print(code)
-            exec(code, global_context)
-            local_context = {
-                k: v
-                for k, v in global_context.items()
-                if k not in dependencies and not isinstance(v, ModuleType)
-            }
-            return local_context
-        except Exception as e:
-            return str(e)
+        text = match.group(1).strip()
+        text = text.replace("```", "")
+        text = text.replace("python", "")
+        return text
 
     @override
     def run(
@@ -112,6 +78,8 @@ class CodeExecutionNode(BaseNode):
         max_attempts: int = 5,
     ):
         """..."""
+        self._token_buffer.extend(code_debagging_node._token_buffer)
+
         if current_attempt > max_attempts:
             yield "Failed"
             return
@@ -130,7 +98,6 @@ class CodeExecutionNode(BaseNode):
         local_context = persisted_variables_history.copy()
         global_context.update(local_context)
         try:
-            print(code)
             exec(code, global_context)
             local_context = {
                 k: v
@@ -141,12 +108,11 @@ class CodeExecutionNode(BaseNode):
 
         except Exception as e:
             print("Error:", str(e))
-            self._token_buffer.extend(code_debagging_node._token_buffer)
             async for chunk in code_debagging_node.arun(
                 question=question,
                 dataset_summary=dataset_summary,
                 code=code,
-                error_message=str(e),
+                error_message=self.get_steamed_tokens() + str(e),
                 dependencies=dependencies,
                 db=db,
                 user_id=user_id,

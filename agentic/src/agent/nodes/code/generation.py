@@ -13,43 +13,26 @@ from services.memory import agent_memory_service
 
 
 dependencies = [
-    "numpy",
-    "pandas",
-    "scipy",
-    "statsmodels",
-    "pingouin",
-    "linearmodels",
-    "sklearn",
-    "imbalanced-learn",
-    "category_encoders",
-    "feature-engine",
-    "xgboost",
+    "numpy",  # import numpy as np
+    "pandas",  # import pandas as pd
+    "scipy",  # import scipy
+    "sklearn",  # from sklearn import ...
+    "statsmodels.api",  # import statsmodels.api as sm
+    "joblib",  # import joblib
+    "torch",  # import torch
+    "torchvision",
     "lightgbm",
-    "catboost",
-    "torch",
-    "keras",
+    "xgboost",
     "optuna",
-    "hyperopt",
-    "joblib",
-    "shap",
-    "lime",
-    "eli5",
-    "yellowbrick",
-    "matplotlib",
-    "seaborn",
-    "plotly",
-    "bokeh",
-    "missingno",
-    "pydotplus",
-    "graphviz",
-    "nltk",
-    "spacy",
-    "tsfresh",
-    "smote-variants",
-    "fastparquet",
-    "pyarrow",
-    "tqdm",
-    "requests",
+    "sentence_transformers",
+    "gensim==4.3.2",
+    "matplotlib.pyplot",  # import matplotlib.pyplot as plt
+    "seaborn",  # import seaborn as sns
+    "plotly.express",  # import plotly.express as px
+    "nltk",  # import nltk
+    "spacy",  # import spacy
+    "tqdm",  # from tqdm import tqdm
+    "networkx",  # import networkx as nx
 ]
 
 
@@ -81,7 +64,6 @@ class CodeGenerationNode(BaseNode):
         dependencies: List[str] = dependencies,
     ):
         """..."""
-        self._token_buffer = []
         code_history = pickle.loads(
             self.memory.get_memory(
                 db=db,
