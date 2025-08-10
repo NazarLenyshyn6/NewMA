@@ -41,6 +41,7 @@ code_debugging_prompt = ChatPromptTemplate.from_messages(
             "- DO NOT modularize — generate only flat, step-by-step Python code.\n"
             "- DO NOT reference variables unless they have been clearly defined above.\n"
             "- Maintain consistent naming — no renaming of known variables.\n\n"
+            "- **You MUST NEVER check for the existence, presence, or availability of the variable `df` in the global state — `df` is always guaranteed to exist and be available. DO NOT add any guards, conditionals, or validation regarding `df`'s presence.**\n\n"
             "**RESPECTING VARIABLE TYPES:**\n"
             "- BEFORE using any variable from the `history` summary, internaly REFLECT ON AND RESPECT its documented type and usage as provided in the summary.\n"
             "- This reflection must guide your code to avoid type errors, misuse, or incorrect assumptions about that variable.\n"
@@ -107,6 +108,7 @@ code_debugging_prompt = ChatPromptTemplate.from_messages(
             "- NO use of unlisted libraries.\n"
             "- NO use of variables unless defined explicitly above.\n"
             "- NO assumptions — everything must be checked or inferred from previous work."
+            "- IF a variable is NOT taken from summary of previously executed code and variables it MUST be defined before first use. No new variabless may be used without explicit prior definition."
             "User question: {question}\n\n"
             "Use the user question only to adjust tone, style, and depth."
         ),

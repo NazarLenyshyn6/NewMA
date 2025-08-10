@@ -40,10 +40,10 @@ class ParallelSummarizationNode(BaseParallelNode):
         storage_uri: str,
         code_generation_message: str,
         conversation: str,
+        question: str,
         persisted_variables: List,
     ):
         """..."""
-        print("Persist varialbes:", persisted_variables)
 
         # Get data
         history: AgentMemory = self.memory.get_memory(
@@ -73,6 +73,7 @@ class ParallelSummarizationNode(BaseParallelNode):
                 lambda input: {
                     "conversation": input["conversation"],
                     "history": input["conversation_history"],
+                    "question": question,
                 }
             )
             | conversation_summarization_prompt
@@ -92,6 +93,7 @@ class ParallelSummarizationNode(BaseParallelNode):
             "conversation": conversation,
             "conversation_history": pickle.loads(history.conversation_context),
             "persisted_variables": persisted_variables,
+            "question": question,
         }
 
         return parallel_chain.invoke(inputs)

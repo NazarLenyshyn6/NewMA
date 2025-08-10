@@ -35,15 +35,13 @@ class CodeExecutionNode(BaseNode):
     @staticmethod
     def _extract_code(message: str) -> Optional[str]:
         """..."""
-        pattern = r"```(?:python)?\n(.*?)(?:\n```)?$"
+        pattern = r"```python\s([\s\S]*?)```"
         match = re.search(pattern, message.strip(), re.DOTALL)
 
         if not match:
             return None
 
         text = match.group(1).strip()
-        text = text.replace("```", "")
-        text = text.replace("python", "")
         return text
 
     @staticmethod
@@ -84,7 +82,10 @@ class CodeExecutionNode(BaseNode):
         max_attempts: int = 5,
     ):
         """..."""
-        self._token_buffer.extend(code_debagging_node._token_buffer)
+        if current_attempt == 1:
+            self._token_buffer = []
+        else:
+            self._token_buffer.extend(code_debagging_node._token_buffer)
 
         if current_attempt > max_attempts:
             yield "Failed"
@@ -119,7 +120,7 @@ class CodeExecutionNode(BaseNode):
                 question=question,
                 dataset_summary=dataset_summary,
                 code=code,
-                error_message=self.get_steamed_tokens() + str(e),
+                error_message=str(e),
                 dependencies=dependencies,
                 db=db,
                 user_id=user_id,

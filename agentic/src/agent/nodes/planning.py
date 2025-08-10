@@ -47,7 +47,7 @@ class PlanningNode(BaseNode):
                 storage_uri=storage_uri,
             ).conversation_context
         )
-        print(history)
+        print("Conversation history:", history)
         async for chunk in self._chain.astream(
             {"question": question, "history": history}
         ):

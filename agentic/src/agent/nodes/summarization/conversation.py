@@ -18,6 +18,7 @@ class ConversationSummarizationNode(BaseNode):
     @override
     def run(
         self,
+        question: str,
         conversation: str,
         db: Optional[Session] = None,
         user_id: Optional[int] = None,
@@ -35,7 +36,7 @@ class ConversationSummarizationNode(BaseNode):
             ).code_context
         )
         return self._chain.invoke(
-            {"conversation": conversation, "history": history}
+            {"conversation": conversation, "history": history, "question": question}
         ).content
 
     @override

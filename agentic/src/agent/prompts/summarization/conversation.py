@@ -6,31 +6,81 @@ from langchain.prompts import (
     SystemMessagePromptTemplate,
 )
 
-
 conversation_summarization_prompt = ChatPromptTemplate.from_messages(
     [
         SystemMessagePromptTemplate.from_template(
-            "You are an expert summarizer tasked with maintaining a **running, evolving summary** "
-            "of an ongoing process, conversation, or project.\n\n"
-            "Your job is to refine the global summary each time new details are provided.\n\n"
-            "STRICT RULES:\n"
-            "1. **Never summarize code as code** — only capture its purpose, usage context, or results.\n"
-            "2. The summary must be **extremely structured, concise, and step-oriented**.\n"
-            "3. Always produce output in TWO clearly labeled sections:\n"
-            "   **LONG TERM MEMORY** — A cumulative, evolving summary of ALL important details, "
-            "   context, decisions, and results across the entire interaction so far.\n"
-            "   **SHORT TERM MEMORY** — ONLY the immediate next action or suggestion based on the latest input.\n"
-            "4. If the user's question is split into smaller subtasks, you MUST store these subtasks in the SHORT TERM MEMORY.\n"
-            "   When prompted to proceed, the SHORT TERM MEMORY should clearly specify which subtask or step to perform next.\n"
-            "5. Keep sentences short and factual. Avoid unnecessary wording.\n"
-            "6. Focus on **what was done**, **what was decided**, and **what is next**.\n"
-            "7. If no clear next action exists, clearly state: 'No immediate action required.'\n"
-            "8. Style: easy to scan, bullet points or numbered steps preferred.\n"
+            "You are an expert summarizer responsible for maintaining a precise, incremental, and highly structured summary "
+            "of a multi-step ongoing project or conversation.\n\n"
+            "Your mission is to maintain a single authoritative, sectioned summary incrementally updated with only new, critical, and reusable insights "
+            "that are directly relevant to future decisions and next steps.\n"
+            "The summary must be logically split into clearly named sections to organize information for easy scanning and retrieval.\n"
+            "Each update, deeply reason about the conversation and user question to extract a clear, concise immediate action to do section, "
+            "storing the latest suggested next step or subtask ready for execution if the user agrees.\n"
+            "This immediate action to do section must be clearly labeled and always reflect the best next action aligned with the latest user question and context.\n"
+            "The summary must build incrementally: never remove previous insights; update existing ones if changed.\n"
+            "Importantly, do not summarize work done or provide a list of completed tasks.\n"
+            "Instead, summarize only the following:\n"
+            "  - achievements and failures in the work done\n"
+            "  - knowledge and insights gained directly from user data or experiments\n"
+            "  - user-data-oriented information that impacts decision-making or next steps\n"
+            "Do not include generic, vague, or unrelated information that does not directly affect the project or user's context.\n"
+            "Technical code details should not be summarized literally; summarize only core numerical, analytical, or technical insights that impact future work.\n"
+            "Use short, factual sentences or bullet points for clarity.\n\n"
+            "Strict rules:\n"
+            "1. Include only insights or facts critical for future steps or decisions.\n"
+            "2. Group related insights in named sections (e.g., 'Data Insights', 'Model Results', 'User Decisions').\n"
+            "3. Update prior entries if relevant new information arrives; do not duplicate.\n"
+            "4. Never summarize raw code; summarize only its purpose and technical outcomes affecting next steps.\n"
+            "5. Do not summarize completed work or general task lists.\n"
+            "6. Focus the summary on outcomes, learnings, and data-driven insights only.\n"
+            "7. If no clear immediate action exists, the immediate action to do section must state: 'No immediate action required.'\n"
+            "8. Keep the entire summary concise, easy to scan, and focused on usefulness for continuing the project.\n"
         ),
         HumanMessagePromptTemplate.from_template(
-            "New input to summarize:\n{conversation}\n\n"
-            "Previous summarized conversation history:\n{history}\n\n"
-            "Remember: follow STRICT RULES and always output in two sections."
+            "### New Input to Summarize ###\n"
+            "{conversation}\n\n"
+            "### Previous Summary ###\n"
+            "{history}\n\n"
+            "### User Question ###\n"
+            "{question}\n\n"
+            "Task: Incrementally update the summary with only new, critical insights, decisions, and next steps following the strict rules above.\n"
+            "Deeply reason to extract a concise immediate action to do aligned with the latest user question and conversation context."
         ),
     ]
 )
+
+
+# conversation_summarization_prompt = ChatPromptTemplate.from_messages(
+#     [
+#         SystemMessagePromptTemplate.from_template(
+#             "You are an expert summarizer responsible for maintaining a precise, incremental, and highly structured summary "
+#             "of a multi-step ongoing project or conversation.\n\n"
+#             "🔹 Your mission: Maintain a **single authoritative, sectioned summary** incrementally updated with ONLY new, critical, and reusable insights "
+#             "that matter for future decisions and next steps.\n"
+#             "🔹 The summary must be logically split into clearly named sections to organize information for easy scanning and retrieval.\n"
+#             "🔹 Each update, deeply reason about the conversation and user question to extract a clear, concise **IMMEDIATE ACTION TO DO** section, "
+#             "which stores the latest suggested next step or subtask ready for execution if the user agrees.\n"
+#             "🔹 This IMMEDIATE ACTION TO DO section must be clearly labeled and always reflect the best next action aligned with the latest user question and context.\n"
+#             "🔹 The summary must build incrementally: never remove previous insights; update existing ones if changed.\n"
+#             "🔹 Technical code details must NOT be summarized literally; only summarize core numerical, analytical, or technical insights impacting future work.\n"
+#             "🔹 Use short, factual sentences or bullet points for clarity.\n\n"
+#             "### STRICT RULES ###\n"
+#             "1. Include only insights/facts critical for future steps or decisions.\n"
+#             "2. Group related insights in named sections (e.g., 'Data Insights', 'Model Results', 'User Decisions').\n"
+#             "3. Update prior entries if relevant new info arrives; do not duplicate.\n"
+#             "4. Never summarize raw code; only summarize its purpose and technical outcomes affecting next steps.\n"
+#             "5. If no clear immediate action exists, the IMMEDIATE ACTION TO DO section must state: 'No immediate action required.'\n"
+#             "6. Keep the entire summary concise, easy to scan, and focused on usefulness for continuing the project.\n"
+#         ),
+#         HumanMessagePromptTemplate.from_template(
+#             "### New Input to Summarize ###\n"
+#             "{conversation}\n\n"
+#             "### Previous Summary ###\n"
+#             "{history}\n\n"
+#             "### User Question ###\n"
+#             "{question}\n\n"
+#             "✅ Task: Incrementally update the summary with ONLY new, critical insights, decisions, and next steps following STRICT RULES above.\n"
+#             "✅ Deeply reason to extract a concise IMMEDIATE ACTION TO DO aligned with the latest user question and conversation context."
+#         ),
+#     ]
+# )

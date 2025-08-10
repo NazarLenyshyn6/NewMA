@@ -57,6 +57,7 @@ class AgentService:
             conversation_summary = conversation_summarization_node.run(
                 conversation=conversation_summarization_node.get_steamed_tokens(),
                 db=db,
+                question=question,
                 user_id=user_id,
                 session_id=session_id,
                 file_name=file_name,
@@ -128,6 +129,7 @@ class AgentService:
                     persisted_variables=[
                         variable for variable in persisted_variables.keys()
                     ],
+                    question=question,
                     user_id=user_id,
                     session_id=session_id,
                     file_name=file_name,
@@ -161,8 +163,6 @@ class AgentService:
                     + techical_response_node.get_steamed_tokens(),
                 }
             ]
-            code_debagging_node._token_buffer = []
-            code_execution_node._token_buffer = []
         conversation_history = agent_memory_service.get_conversation_memory(
             db=db,
             user_id=user_id,

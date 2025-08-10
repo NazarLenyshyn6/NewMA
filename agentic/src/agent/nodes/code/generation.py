@@ -73,7 +73,6 @@ class CodeGenerationNode(BaseNode):
                 storage_uri=storage_uri,
             ).code_context
         )
-        print("Code history:", code_history)
         async for chunk in self._chain.astream(
             {
                 "instruction": instruction,
