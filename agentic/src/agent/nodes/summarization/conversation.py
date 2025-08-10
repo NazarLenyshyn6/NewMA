@@ -33,7 +33,7 @@ class ConversationSummarizationNode(BaseNode):
                 session_id=session_id,
                 file_name=file_name,
                 storage_uri=storage_uri,
-            ).code_context
+            ).conversation_context
         )
         return self._chain.invoke(
             {"conversation": conversation, "history": history, "question": question}
