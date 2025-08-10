@@ -3,7 +3,7 @@
 import re
 import pickle
 from uuid import UUID
-from typing import Optional, override
+from typing import Optional, override, List
 
 from sqlalchemy.orm import Session
 from langchain_core.runnables import RunnableParallel, RunnableLambda
@@ -40,8 +40,10 @@ class ParallelSummarizationNode(BaseParallelNode):
         storage_uri: str,
         code_generation_message: str,
         conversation: str,
+        persisted_variables: List,
     ):
         """..."""
+        print("Persist varialbes:", persisted_variables)
 
         # Get data
         history: AgentMemory = self.memory.get_memory(
@@ -56,7 +58,11 @@ class ParallelSummarizationNode(BaseParallelNode):
         # Create chains
         code_summarization_chain = (
             RunnableLambda(
-                lambda input: {"code": input["code"], "history": input["code_history"]}
+                lambda input: {
+                    "code": input["code"],
+                    "history": input["code_history"],
+                    "persisted_variables": f"{persisted_variables}",
+                }
             )
             | code_summarization_prompt
             | self.model
@@ -85,6 +91,7 @@ class ParallelSummarizationNode(BaseParallelNode):
             "code_history": pickle.loads(history.code_context),
             "conversation": conversation,
             "conversation_history": pickle.loads(history.conversation_context),
+            "persisted_variables": persisted_variables,
         }
 
         return parallel_chain.invoke(inputs)

@@ -125,6 +125,9 @@ class AgentService:
 
                 summary = parallel_summarization_node.run(
                     db=db,
+                    persisted_variables=[
+                        variable for variable in persisted_variables.keys()
+                    ],
                     user_id=user_id,
                     session_id=session_id,
                     file_name=file_name,

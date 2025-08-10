@@ -1,7 +1,7 @@
 """..."""
 
 import re
-from typing import override, Optional, List
+from typing import override, Optional, List, Any
 from types import ModuleType
 import importlib
 from uuid import UUID
@@ -19,8 +19,6 @@ from agent.nodes.code.debagging import code_debagging_node, CodeDebaggingNode
 
 class CodeExecutionNode(BaseNode):
     """..."""
-
-    _debagged_token_buffer: list = PrivateAttr()
 
     @staticmethod
     def _import_dependencies(dependencies: List[str]):
@@ -47,6 +45,14 @@ class CodeExecutionNode(BaseNode):
         text = text.replace("```", "")
         text = text.replace("python", "")
         return text
+
+    @staticmethod
+    def _is_pickle_serializable(obj: Any) -> bool:
+        try:
+            pickle.dumps(obj)
+            return True
+        except Exception:
+            return False
 
     @override
     def run(
@@ -103,6 +109,7 @@ class CodeExecutionNode(BaseNode):
                 k: v
                 for k, v in global_context.items()
                 if k not in dependencies and not isinstance(v, ModuleType)
+                if self._is_pickle_serializable(v)
             }
             yield local_context
 

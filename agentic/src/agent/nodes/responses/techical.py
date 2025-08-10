@@ -2,6 +2,7 @@
 
 from typing import override, Optional, List
 from uuid import UUID
+import pickle
 
 from sqlalchemy.orm import Session
 
@@ -58,9 +59,18 @@ class TechicalResponseNode(BaseNode):
     ):
         """..."""
         self._token_buffer = []
+        history = pickle.loads(
+            self.memory.get_memory(
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+            ).conversation_context
+        )
         report = self._parse_analysis_report(analysis_report)
         async for chunk in self._chain.astream(
-            {"question": question, "report": report}
+            {"question": question, "report": report, "history": history}
         ):
             chunk = chunk.content
             self._token_buffer.append(chunk)
