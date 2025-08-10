@@ -11,6 +11,7 @@ from agent.nodes.planning import planning_node
 from agent.nodes.code.generation import code_generation_node
 from agent.nodes.code.execution import code_execution_node
 from agent.nodes.responses.techical import techical_response_node
+from agent.nodes.code.debagging import code_debagging_node
 from agent.nodes.summarization.conversation import conversation_summarization_node
 from agent.nodes.summarization.parallel import parallel_summarization_node
 from services.memory import agent_memory_service
@@ -94,6 +95,7 @@ class AgentService:
             persisted_variables = None
             async for chunk in code_execution_node.arun(
                 question=question,
+                dataset_summary=dataset_summary,
                 code_generation_message=code_generation_node.get_steamed_tokens(),
                 db=db,
                 user_id=user_id,
@@ -103,6 +105,7 @@ class AgentService:
             ):
                 if isinstance(chunk, dict):
                     persisted_variables = chunk
+                    break
                 elif chunk == "Failed":
                     break
                 else:
@@ -151,6 +154,7 @@ class AgentService:
                     "question": question,
                     "answer": planning_node.get_steamed_tokens()
                     + code_generation_node.get_steamed_tokens()
+                    + code_execution_node.get_steamed_tokens()
                     + techical_response_node.get_steamed_tokens(),
                 }
             ]

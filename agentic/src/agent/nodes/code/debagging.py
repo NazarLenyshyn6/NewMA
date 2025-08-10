@@ -32,6 +32,7 @@ class CodeDebaggingNode(BaseNode):
         self,
         question: str,
         code: str,
+        dataset_summary: str,
         error_message: str,
         dependencies: List[str] = dependencies,
         db: Optional[Session] = None,
@@ -41,7 +42,7 @@ class CodeDebaggingNode(BaseNode):
         storage_uri: Optional[str] = None,
     ):
         """..."""
-        self._token_buffer = []
+        print("Error to fix:", error_message)
         history = pickle.loads(
             self.memory.get_memory(
                 db=db,
@@ -51,6 +52,7 @@ class CodeDebaggingNode(BaseNode):
                 storage_uri=storage_uri,
             ).code_context
         )
+        self._token_buffer = []
         async for chunk in self._chain.astream(
             {
                 "question": question,
@@ -58,6 +60,7 @@ class CodeDebaggingNode(BaseNode):
                 "dependencies": dependencies,
                 "error_message": error_message,
                 "code_context": history,
+                "dataset_summary": dataset_summary,
             }
         ):
             chunk = chunk.content

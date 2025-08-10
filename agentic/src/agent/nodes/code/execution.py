@@ -45,15 +45,54 @@ class CodeExecutionNode(BaseNode):
 
         return match.group(1).strip()
 
-    @override
-    def run(
+    def _execute(
         self,
         question: str,
+        code_generation_message: str,
         db: Optional[Session] = None,
         user_id: Optional[int] = None,
         session_id: Optional[UUID] = None,
         file_name: Optional[str] = None,
         storage_uri: Optional[str] = None,
+        dependencies: List[str] = dependencies,
+    ):
+        persisted_variables_history = pickle.loads(
+            self.memory.get_memory(
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+            ).persisted_variables
+        )
+        code = self._extract_code(code_generation_message)
+        global_context = self._import_dependencies(dependencies)
+        local_context = persisted_variables_history.copy()
+        global_context.update(local_context)
+        try:
+            print("-" * 25)
+            print(code)
+            exec(code, global_context)
+            local_context = {
+                k: v
+                for k, v in global_context.items()
+                if k not in dependencies and not isinstance(v, ModuleType)
+            }
+            return local_context
+        except Exception as e:
+            return str(e)
+
+    @override
+    def run(
+        self,
+        question: str,
+        dataset_summary: str,
+        db: Optional[Session] = None,
+        user_id: Optional[int] = None,
+        session_id: Optional[UUID] = None,
+        file_name: Optional[str] = None,
+        storage_uri: Optional[str] = None,
+        code_debagging_node: CodeDebaggingNode = code_debagging_node,
     ): ...
 
     @override
@@ -61,6 +100,7 @@ class CodeExecutionNode(BaseNode):
         self,
         question: str,
         code_generation_message: str,
+        dataset_summary,
         db: Optional[Session] = None,
         user_id: Optional[int] = None,
         session_id: Optional[UUID] = None,
@@ -73,8 +113,8 @@ class CodeExecutionNode(BaseNode):
     ):
         """..."""
         if current_attempt > max_attempts:
-            code_debagging_node._token_buffer = []
             yield "Failed"
+            return
 
         persisted_variables_history = pickle.loads(
             self.memory.get_memory(
@@ -90,20 +130,21 @@ class CodeExecutionNode(BaseNode):
         local_context = persisted_variables_history.copy()
         global_context.update(local_context)
         try:
+            print(code)
             exec(code, global_context)
             local_context = {
                 k: v
                 for k, v in global_context.items()
                 if k not in dependencies and not isinstance(v, ModuleType)
             }
-            self._token_buffer += code_debagging_node._token_buffer
-            self._debagged_token_buffer = code_debagging_node._token_buffer
-            code_debagging_node._token_buffer = []
             yield local_context
 
         except Exception as e:
+            print("Error:", str(e))
+            self._token_buffer.extend(code_debagging_node._token_buffer)
             async for chunk in code_debagging_node.arun(
                 question=question,
+                dataset_summary=dataset_summary,
                 code=code,
                 error_message=str(e),
                 dependencies=dependencies,
@@ -117,6 +158,7 @@ class CodeExecutionNode(BaseNode):
             fixed_code_generation_message = code_debagging_node.get_steamed_tokens()
             async for chunk in self.arun(
                 question=question,
+                dataset_summary=dataset_summary,
                 code_generation_message=fixed_code_generation_message,
                 db=db,
                 user_id=user_id,
