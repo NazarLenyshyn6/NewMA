@@ -1854,10 +1854,21 @@ const ChatPage: React.FC = () => {
     }
   }, [sessions, restoreActiveSession]);
 
-  // Auto scroll to bottom
+  // Auto scroll to bottom - only when not manually scrolling
+  const [userScrolled, setUserScrolled] = useState(false);
+  
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingMessage]);
+    if (!userScrolled) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, streamingMessage, userScrolled]);
+
+  // Track user scroll behavior
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const element = e.currentTarget;
+    const isAtBottom = element.scrollHeight - element.scrollTop === element.clientHeight;
+    setUserScrolled(!isAtBottom);
+  };
 
   return (
     <div className="h-screen bg-gray-25 flex relative">
@@ -1952,12 +1963,10 @@ const ChatPage: React.FC = () => {
                     {currentSession?.id === session.id && (
                       <>
                         {activeFile?.file_name ? (
-                          <div className="flex items-center space-x-2 mt-2.5 px-2.5 py-1.5 bg-success-50 text-success-700 rounded-xl text-xs font-semibold shadow-soft border border-success-200">
-                            <File className="w-3.5 h-3.5" />
-                            <span className="truncate max-w-[100px]">
-                              📊 {activeFile.file_name}
+                          <div className="mt-2.5 px-2.5 py-1.5 bg-success-50 text-success-700 rounded-xl text-xs font-semibold shadow-soft border border-success-200 min-w-0 flex-shrink">
+                            <span className="block truncate" title={activeFile.file_name}>
+                              {activeFile.file_name}
                             </span>
-                            <div className="w-1.5 h-1.5 bg-success-500 rounded-full animate-bounce-subtle shadow-sm"></div>
                           </div>
                         ) : (
                           <div className="text-xs text-gray-400 mt-2 px-2 italic">
@@ -2039,10 +2048,10 @@ const ChatPage: React.FC = () => {
                 {currentSession?.title || 'ML Agent'}
               </h1>
               {activeFile && (
-                <div className="flex items-center space-x-2.5 px-3.5 py-2 bg-success-50 text-success-700 rounded-2xl text-sm font-semibold shadow-soft border border-success-200 hover:shadow-medium transition-all duration-200">
-                  <div className="w-2 h-2 bg-success-500 rounded-full animate-bounce-subtle shadow-sm"></div>
-                  <File className="w-4 h-4" />
-                  <span>{activeFile.file_name}</span>
+                <div className="flex items-center space-x-2.5 px-3.5 py-2 bg-success-50 text-success-700 rounded-2xl text-sm font-semibold shadow-soft border border-success-200 hover:shadow-medium transition-all duration-200 min-w-0 flex-shrink max-w-xs">
+                  <div className="w-2 h-2 bg-success-500 rounded-full animate-bounce-subtle shadow-sm flex-shrink-0"></div>
+                  <File className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate" title={activeFile.file_name}>{activeFile.file_name}</span>
                 </div>
               )}
             </div>
@@ -2114,7 +2123,7 @@ const ChatPage: React.FC = () => {
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto bg-white">
+        <div className="flex-1 overflow-y-auto bg-white" onScroll={handleScroll}>
           {!currentSession ? (
             <div className="h-full flex items-center justify-center p-12">
               <div className="text-center max-w-3xl bg-white rounded-3xl p-8 shadow-strong border border-primary-100">
