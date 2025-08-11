@@ -115,12 +115,12 @@ class CodeExecutionNode(BaseNode):
             yield local_context
 
         except Exception as e:
-            print("Error:", str(e))
+            print("Error:", f"{e}")
             async for chunk in code_debagging_node.arun(
                 question=question,
                 dataset_summary=dataset_summary,
                 code=code,
-                error_message=str(e),
+                error_message=f"{e}",
                 dependencies=dependencies,
                 db=db,
                 user_id=user_id,

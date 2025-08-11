@@ -15,7 +15,7 @@ direct_response_model = ChatAnthropic(
 contextual_response_model = ChatAnthropic(
     model_name="claude-sonnet-4-20250514",
     anthropic_api_key=settings.anthropic_model.ANTHROPIC_API_KEY,
-    temperature=0.7,
+    temperature=0.4,  # Tested 0.7
     max_tokens=8000,
     streaming=True,
 )
@@ -23,7 +23,7 @@ contextual_response_model = ChatAnthropic(
 techical_response_model = ChatAnthropic(
     model_name="claude-sonnet-4-20250514",
     anthropic_api_key=settings.anthropic_model.ANTHROPIC_API_KEY,
-    temperature=0.5,
+    temperature=0.3,  # Tested 0.5
     max_tokens=8000,
     streaming=True,
 )
@@ -38,7 +38,8 @@ desicion_model = ChatAnthropic(
 planning_model = ChatAnthropic(
     model_name="claude-sonnet-4-20250514",
     anthropic_api_key=settings.anthropic_model.ANTHROPIC_API_KEY,
-    temperature=0.3,
+    temperature=0.2,  # Tested 0.3
+    max_tokens=8000,
     stream_usage=True,
 )
 
@@ -55,7 +56,7 @@ code_generation_model = ChatAnthropic(
 code_debagging_model = ChatAnthropic(
     model_name="claude-sonnet-4-20250514",
     anthropic_api_key=settings.anthropic_model.ANTHROPIC_API_KEY,
-    temperature=0.2,
+    temperature=0.0,
     max_tokens=50000,
     top_k=None,
     top_p=1,
@@ -65,7 +66,7 @@ code_debagging_model = ChatAnthropic(
 summarization_model = ChatAnthropic(
     model_name="claude-sonnet-4-20250514",
     anthropic_api_key=settings.anthropic_model.ANTHROPIC_API_KEY,
-    temperature=0.2,
+    temperature=0.0,  # Tested 0.2
     max_tokens=40000,
     top_k=None,
     top_p=1,
