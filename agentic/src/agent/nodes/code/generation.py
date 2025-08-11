@@ -83,7 +83,7 @@ class CodeGenerationNode(BaseNode):
             ).persisted_variables
         )
         persisted_variables = [key for key in persisted_variables.keys()]
-        print("In code generation we allowe to reuse:", persisted_variables)
+        print("Code history:", code_history)
         async for chunk in self._chain.astream(
             {
                 "instruction": instruction,

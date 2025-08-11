@@ -7,7 +7,7 @@ import pickle
 from sqlalchemy.orm import Session
 
 from agent.nodes.base import BaseNode
-from agent.prompts.responses.technical import techinal_response_prompt
+from agent.prompts.responses.technical import technical_response_prompt
 from agent.models.anthropic_ import techical_response_model
 from services.memory import agent_memory_service
 
@@ -50,6 +50,7 @@ class TechicalResponseNode(BaseNode):
     async def arun(
         self,
         question: str,
+        instruction: str,
         analysis_report: List,
         db: Optional[Session] = None,
         user_id: Optional[int] = None,
@@ -59,18 +60,9 @@ class TechicalResponseNode(BaseNode):
     ):
         """..."""
         self._token_buffer = []
-        history = pickle.loads(
-            self.memory.get_memory(
-                db=db,
-                user_id=user_id,
-                session_id=session_id,
-                file_name=file_name,
-                storage_uri=storage_uri,
-            ).conversation_context
-        )
         report = self._parse_analysis_report(analysis_report)
         async for chunk in self._chain.astream(
-            {"question": question, "report": report, "history": history}
+            {"question": question, "report": report, "instruction": instruction}
         ):
             chunk = chunk.content
             self._token_buffer.append(chunk)
@@ -79,6 +71,6 @@ class TechicalResponseNode(BaseNode):
 
 techical_response_node = TechicalResponseNode(
     model=techical_response_model,
-    prompt=techinal_response_prompt,
+    prompt=technical_response_prompt,
     memory=agent_memory_service,
 )

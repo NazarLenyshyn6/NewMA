@@ -117,6 +117,7 @@ class AgentService:
                 async for chunk in techical_response_node.arun(
                     question=question,
                     analysis_report=analysis_report,
+                    instruction=planning_node.get_steamed_tokens(),
                     db=db,
                     user_id=user_id,
                     session_id=session_id,

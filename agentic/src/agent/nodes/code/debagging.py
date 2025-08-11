@@ -63,7 +63,6 @@ class CodeDebaggingNode(BaseNode):
         )
         self._token_buffer = []
         persisted_variables = [key for key in persisted_variables.keys()]
-        print("In code debaggin we allow to reuse:", persisted_variables)
         async for chunk in self._chain.astream(
             {
                 "question": question,
