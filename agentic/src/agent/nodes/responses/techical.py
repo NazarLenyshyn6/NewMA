@@ -3,6 +3,7 @@
 from typing import override, Optional, List
 from uuid import UUID
 import pickle
+from pprint import pformat
 
 from sqlalchemy.orm import Session
 
@@ -18,23 +19,21 @@ class TechicalResponseNode(BaseNode):
     @staticmethod
     def _parse_analysis_report(analysis_report: list) -> str:
         """..."""
+
         lines = []
-        for i, step in enumerate(analysis_report, 1):
-            lines.append(f"Step {i}: {step.get('step', '')}")
-            lines.append(f"  Purpose: {step.get('why', '')}")
-            lines.append(f"  Key Finding: {step.get('finding', '')}")
-            lines.append(f"  Actions Taken: {step.get('action', '')}")
-            lines.append(f"  Data Summary: {step.get('data_summary', '')}")
-            alerts = step.get("alerts")
-            if alerts:
-                lines.append(f"  Alerts: {alerts}")
-            recommendation = step.get("recommendation")
-            if recommendation:
-                lines.append(f"  Recommendation: {recommendation}")
+        for i, entry in enumerate(analysis_report, 1):
+            lines.append(f"Step {i}:")
+            if isinstance(entry, dict):
+                for key, value in entry.items():
+                    # Use pformat for pretty-printing nested dicts/lists
+                    formatted_value = pformat(value, indent=4, width=80)
+                    lines.append(f"  {key}: {formatted_value}")
+            else:
+                # If entry is not a dict, just stringify it
+                lines.append(f"  {entry}")
             lines.append("")  # Blank line for spacing
 
         return "\n".join(lines)
-
     @override
     def run(
         self,
@@ -61,6 +60,7 @@ class TechicalResponseNode(BaseNode):
         """..."""
         self._token_buffer = []
         report = self._parse_analysis_report(analysis_report)
+        print(report)
         async for chunk in self._chain.astream(
             {"question": question, "report": report, "instruction": instruction}
         ):

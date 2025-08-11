@@ -64,6 +64,7 @@ class CodeGenerationNode(BaseNode):
         dependencies: List[str] = dependencies,
     ):
         """..."""
+        self._token_buffer = []
         code_history = pickle.loads(
             self.memory.get_memory(
                 db=db,
@@ -83,7 +84,6 @@ class CodeGenerationNode(BaseNode):
             ).persisted_variables
         )
         persisted_variables = [key for key in persisted_variables.keys()]
-        print("Code history:", code_history)
         async for chunk in self._chain.astream(
             {
                 "instruction": instruction,
