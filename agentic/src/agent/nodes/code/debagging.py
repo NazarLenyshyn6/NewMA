@@ -52,7 +52,18 @@ class CodeDebaggingNode(BaseNode):
                 storage_uri=storage_uri,
             ).code_context
         )
+        persisted_variables = pickle.loads(
+            self.memory.get_memory(
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+            ).persisted_variables
+        )
         self._token_buffer = []
+        persisted_variables = [key for key in persisted_variables.keys()]
+        print("In code debaggin we allow to reuse:", persisted_variables)
         async for chunk in self._chain.astream(
             {
                 "question": question,
@@ -61,6 +72,7 @@ class CodeDebaggingNode(BaseNode):
                 "error_message": error_message,
                 "code_context": history,
                 "dataset_summary": dataset_summary,
+                "persisted_variables": persisted_variables
             }
         ):
             chunk = chunk.content

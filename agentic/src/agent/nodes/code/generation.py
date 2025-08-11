@@ -73,7 +73,17 @@ class CodeGenerationNode(BaseNode):
                 storage_uri=storage_uri,
             ).code_context
         )
-        print("Code history:", code_history)
+        persisted_variables = pickle.loads(
+            self.memory.get_memory(
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+            ).persisted_variables
+        )
+        persisted_variables = [key for key in persisted_variables.keys()]
+        print("In code generation we allowe to reuse:", persisted_variables)
         async for chunk in self._chain.astream(
             {
                 "instruction": instruction,
@@ -81,6 +91,7 @@ class CodeGenerationNode(BaseNode):
                 "dataset_summary": dataset_summary,
                 "dependencies": dependencies,
                 "question": question,
+                "persisted_variables": persisted_variables
             }
         ):
             chunk = chunk.content

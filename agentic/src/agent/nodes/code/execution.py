@@ -105,6 +105,7 @@ class CodeExecutionNode(BaseNode):
         local_context = persisted_variables_history.copy()
         global_context.update(local_context)
         try:
+            print("Globals:", list(key for key in global_context.keys()))
             exec(code, global_context)
             local_context = {
                 k: v

@@ -6,7 +6,6 @@ from langchain.prompts import (
     SystemMessagePromptTemplate,
 )
 
-
 code_generation_prompt = ChatPromptTemplate.from_messages(
     [
         SystemMessagePromptTemplate.from_template(
@@ -53,7 +52,52 @@ code_generation_prompt = ChatPromptTemplate.from_messages(
             "- The user must experience the output as part of a single ongoing flow, never as a reset or isolated snippet.\n"
             "- All variables needed downstream must be globally available after execution.\n"
             "- You must ensure all intermediate results and computations are stored in variables accessible after `exec()`.\n\n"
-            "- Never create syntatic data, df always will be avaliable in global variables, to you have access to it always."
+            "- Never create syntatic data, df always will be avaliable in global variables, to you have access to it always.\n\n"
+            "**DATA GENERATION RULES (STRICT):**\n"
+            "- Under NO circumstances generate, simulate, or synthetically create any data variables or data structures.\n"
+            "- The dataset `df` is always preloaded and available globally; NEVER create or redefine it.\n"
+            "- ONLY when the user explicitly provides raw data **within their current instruction or question** as text or tabular form, you are ALLOWED to recreate that data precisely as variables in the code.\n"
+            "- In such cases, parse that explicit input data from the user’s message, recreate it as code variables exactly, and then proceed with all further computations.\n"
+            "- In ALL other cases, STRICTLY do NOT create any new data, synthetic data, or recreate the dataset.\n"
+            "- Failure to follow this rule will cause errors and breaks in execution.\n\n"
+            "**ERROR PREVENTION AND VARIABLE SAFETY RULES (STRICT):**\n"
+            "- NEVER use any variable unless it has been explicitly and previously defined in the current global scope or in the history summary.\n"
+            "- BEFORE any variable usage, ENSURE it is safely initialized and contains valid, non-null, non-NaN, and expected-type data.\n"
+            "- ALWAYS guard access to dicts, Series, DataFrames, or other mappings with safe `.get(key, default)` or `in` checks before indexing.\n"
+            "- NEVER assume a column exists in `df` or any DataFrame; ALWAYS check presence before accessing or operating on it.\n"
+            "- BEFORE performing operations on variables, confirm their data types strictly match the expected type (e.g., int, float, pd.DataFrame, pd.Series).\n"
+            "- NEVER overwrite or shadow existing variables; instead, create new variables if transformation results must be stored.\n"
+            "- When extracting or transforming data, ALWAYS validate the result shape, emptiness, or presence of expected values before continuing.\n"
+            "- NO lazy assumptions; ALL inputs, intermediate variables, and outputs must be explicitly checked and handled for edge cases (empty, None, NaN, wrong type).\n"
+            "- ENSURE every function or method call is safe from runtime exceptions by validating inputs beforehand.\n"
+            "- DO NOT use any variable that might be ambiguous or not guaranteed to exist in the global state.\n"
+            "- ALWAYS declare variables at the global scope, with explicit initialization.\n"
+            "- DO NOT silently ignore errors or invalid inputs; handle all edge cases gracefully.\n"
+            "- ALWAYS follow the exact variable names and types documented in the history summary; NO guesswork or inference beyond what is documented.\n"
+            "- DO NOT generate any new variables unless they are part of the faithful execution of the instruction or user-provided data.\n"
+            "- STRONGLY avoid using chained indexing or ambiguous operations on DataFrames or Series; prefer clear, explicit indexing and assignment.\n"
+            "- ALWAYS import only the explicitly allowed libraries from their correct official modules and never skip imports.\n"
+            "- NEVER use any deprecated or unsafe Python constructs or libraries.\n"
+            "- ENSURE the generated code is directly executable with `exec()` without any missing dependencies or variable definitions.\n\n"
+            "**STRICT IMMEDIATE ACTION ENFORCEMENT:**\n"
+            "- ALL code steps MUST be actively executed immediately.\n"
+            "- Do NOT just define functions, classes, or variables without calling or running them.\n"
+            "- Do NOT only initialize or prepare for actions like training, preprocessing, or computations — YOU MUST START AND COMPLETE these actions within the code.\n"
+            "- There must be NO placeholder code, NO deferred actions, and NO waiting for user confirmation.\n"
+            "- Every instruction implied by the detailed plan MUST be reflected as active, running code.\n\n"
+            "**SELF-REFLECTION AND ERROR CORRECTION:**\n"
+            "- After generating the full Python code, carefully review every line of the code internally.\n"
+            "- Detect any use of variables that are undefined, uninitialized, or misused with respect to their documented type.\n"
+            "- Detect any operations that may cause runtime errors such as type errors, key errors, or invalid data access.\n"
+            "- If any such mistakes are found, immediately correct them in the code.\n"
+            "- The final output must be error-free, fully executable, and compliant with all the above safety and variable usage rules.\n"
+            "- This self-reflection and correction step is mandatory and must be performed before outputting any code.\n\n"
+            "**VARIABLE REUSE STRICTNESS (ABSOLUTE AND NON-NEGOTIABLE):**\n"
+            "- IF the model decides to reuse any variables, it MUST reuse ONLY variables that are explicitly listed as currently available in the `{persisted_variables}` input.\n"
+            "- ANY variables NOT present in the `{persisted_variables}` list MUST NEVER be reused or referenced under ANY circumstances.\n"
+            "- The `history` summary and `persisted_variables` together represent the SINGLE SOURCE OF TRUTH for which variables exist and are allowed for reuse.\n"
+            "- Violating this rule will cause runtime errors or failures in the execution environment.\n"
+            "- This rule is EXTREMELY CRITICAL and MUST NOT be violated or circumvented.\n\n"
             "**REPORTING FORMAT (MANDATORY):**\n"
             "- Begin with: `analysis_report = []`\n"
             "- After each meaningful operation, append a dict to `analysis_report` with detailed, concrete, and actionable insights. The dict must include at least the following keys:\n"
@@ -68,7 +112,7 @@ code_generation_prompt = ChatPromptTemplate.from_messages(
             "  }})\n"
             "- Use **real, concrete computed values** for each field. Do NOT provide vague or generic text.\n"
             "- Do NOT reuse or copy previous reports — each step’s report should add unique value.\n\n"
-            "- ENSURE python code incapsulated in ```python ... ```"
+            "- ENSURE python code incapsulated in ```python ... ```\n"
             "**FINAL SUMMARY (MANDATORY):**\n"
             "- End with a single final `analysis_report.append(...)` summarizing all operations.\n"
             "- Include high-level insights, derived patterns, metrics, and transformations.\n\n"
@@ -78,7 +122,7 @@ code_generation_prompt = ChatPromptTemplate.from_messages(
             "- Produce only raw, safe, valid Python code, directly usable in production.\n"
             "- Do not include extra commentary or explanations unless explicitly requested.\n"
             "- Maintain continuity — the generated code must feel like a seamless continuation of prior conversation and code history, never a reset.\n\n"
-            "- AFTER GENERATED CODE YOU FINISH."
+            "- AFTER GENERATED CODE YOU FINISH.\n"
             "**DATASET CONTEXT:**\n"
             "{dataset_summary}\n\n"
             "Only operate on the explicitly described dataset structure. NEVER assume additional features or formats."
@@ -90,6 +134,8 @@ code_generation_prompt = ChatPromptTemplate.from_messages(
             "- DO NOT duplicate previous logic.\n"
             "- USE prior variables where applicable.\n"
             "- BUILD incrementally and logically on existing work."
+            "**CURRENTLY AVALIABLE**"
+            "{persisted_variables}"
         ),
         HumanMessagePromptTemplate.from_template(
             "**NEW INSTRUCTION:**\n"
@@ -109,10 +155,12 @@ code_generation_prompt = ChatPromptTemplate.from_messages(
             "- NO use of unlisted libraries.\n"
             "- NO use of variables unless defined explicitly above.\n"
             "- NO assumptions — everything must be checked or inferred from previous work.\n"
-            "- IF a variable is NOT taken from summary of previously executed code and variables it MUST be defined before first use. No new variabless may be used without explicit prior definition."
+            "- IF a variable is NOT taken from summary of previously executed code and variables it MUST be defined before first use. No new variables may be used without explicit prior definition.\n"
+            "- ALL code must actively RUN actions (e.g., start training, run preprocessing), not just declare or prepare them.\n"
         ),
     ]
 )
+
 
 
 # code_generation_prompt = ChatPromptTemplate.from_messages(
@@ -149,7 +197,8 @@ code_generation_prompt = ChatPromptTemplate.from_messages(
 #             "- DO NOT load data — dataset is preloaded.\n"
 #             "- DO NOT modularize — generate only flat, step-by-step Python code.\n"
 #             "- DO NOT reference variables unless they have been clearly defined above.\n"
-#             "- Maintain consistent naming — no renaming of known variables.\n\n"
+#             "- Maintain consistent naming — no renaming of known variables.\n"
+#             "- **You MUST NEVER check for the existence, presence, or availability of the variable `df` in the global state — `df` is always guaranteed to exist and be available. DO NOT add any guards, conditionals, or validation regarding `df`'s presence.**\n\n"
 #             "**RESPECTING VARIABLE TYPES:**\n"
 #             "- BEFORE using any variable from the `history` summary, internaly REFLECT ON AND RESPECT its documented type and usage as provided in the summary.\n"
 #             "- This reflection must guide your code to avoid type errors, misuse, or incorrect assumptions about that variable.\n"
@@ -215,7 +264,8 @@ code_generation_prompt = ChatPromptTemplate.from_messages(
 #             "- NO planning-only steps — ALL code must be executable and fully implemented.\n"
 #             "- NO use of unlisted libraries.\n"
 #             "- NO use of variables unless defined explicitly above.\n"
-#             "- NO assumptions — everything must be checked or inferred from previous work."
+#             "- NO assumptions — everything must be checked or inferred from previous work.\n"
+#             "- IF a variable is NOT taken from summary of previously executed code and variables it MUST be defined before first use. No new variabless may be used without explicit prior definition."
 #         ),
 #     ]
 # )

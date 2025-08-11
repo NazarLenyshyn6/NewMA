@@ -30,6 +30,7 @@ class AgentService:
         storage_uri: str,
     ):
         """..."""
+        code_execution_node._token_buffer = []
         response = decision_node.run(
             question=question,
             db=db,
