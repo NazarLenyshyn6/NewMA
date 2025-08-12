@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info, Save, ChevronDown, ChevronRight, Move, Maximize2, Minimize2, RefreshCw } from 'lucide-react';
+import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info, Save, ChevronDown, ChevronRight, Move, Maximize2, Minimize2, RefreshCw, BookOpen } from 'lucide-react';
 import { apiEndpoints, getAuthHeaders } from '@/lib/api';
 
 interface Session {
@@ -76,6 +76,7 @@ const ChatPage: React.FC = () => {
   const [loadingDatasetInfo, setLoadingDatasetInfo] = useState(false);
   const [savingConversation, setSavingConversation] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [businessMode, setBusinessMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -189,14 +190,15 @@ const ChatPage: React.FC = () => {
       console.log('🔄 Resending question:', lastUserMessage.content.substring(0, 50) + '...');
       
       // Try streaming endpoint
-      let response = await fetch(`${apiEndpoints.chat}/stream?question=${encodeURIComponent(lastUserMessage.content)}`, {
+      const endpoint = businessMode ? '/stream/business' : '/stream/technical';
+      let response = await fetch(`${apiEndpoints.chat}${endpoint}?question=${encodeURIComponent(lastUserMessage.content)}`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
 
       // If that fails, try with trailing slash
       if (!response.ok && (response.status === 404 || response.status === 405)) {
-        response = await fetch(`${apiEndpoints.chat}/stream/?question=${encodeURIComponent(lastUserMessage.content)}`, {
+        response = await fetch(`${apiEndpoints.chat}${endpoint}/?question=${encodeURIComponent(lastUserMessage.content)}`, {
           method: 'GET',
           headers: getAuthHeaders(),
         });
@@ -1658,11 +1660,13 @@ const ChatPage: React.FC = () => {
     try {
       console.log('🚀 Starting streaming request for question:', currentQuestion.substring(0, 50) + '...');
       if (DEBUG_STREAMING) {
-        console.log('Starting streaming request to:', `${apiEndpoints.chat}/stream?question=${encodeURIComponent(currentQuestion)}`);
+        const endpoint = businessMode ? '/stream/business' : '/stream/technical';
+        console.log('Starting streaming request to:', `${apiEndpoints.chat}${endpoint}?question=${encodeURIComponent(currentQuestion)}`);
       }
       
       // Try streaming endpoint - first without trailing slash
-      let response = await fetch(`${apiEndpoints.chat}/stream?question=${encodeURIComponent(currentQuestion)}`, {
+      const endpoint = businessMode ? '/stream/business' : '/stream/technical';
+      let response = await fetch(`${apiEndpoints.chat}${endpoint}?question=${encodeURIComponent(currentQuestion)}`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -1670,7 +1674,7 @@ const ChatPage: React.FC = () => {
       // If that fails, try with trailing slash
       if (!response.ok && (response.status === 404 || response.status === 405)) {
         console.log(`Streaming endpoint failed with ${response.status}, trying with trailing slash...`);
-        response = await fetch(`${apiEndpoints.chat}/stream/?question=${encodeURIComponent(currentQuestion)}`, {
+        response = await fetch(`${apiEndpoints.chat}${endpoint}/?question=${encodeURIComponent(currentQuestion)}`, {
           method: 'GET',
           headers: getAuthHeaders(),
         });
@@ -1873,6 +1877,7 @@ const ChatPage: React.FC = () => {
     }
   }, [messages, streamingMessage, userScrolled]);
 
+
   // Track user scroll behavior
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const element = e.currentTarget;
@@ -2054,16 +2059,6 @@ const ChatPage: React.FC = () => {
               </button>
             )}
             <div className="flex items-center space-x-4">
-              <h1 className="text-xl font-bold text-gray-900">
-                {currentSession?.title || 'ML Agent'}
-              </h1>
-              {activeFile && (
-                <div className="flex items-center space-x-2.5 px-3.5 py-2 bg-success-50 text-success-700 rounded-2xl text-sm font-semibold shadow-soft border border-success-200 hover:shadow-medium transition-all duration-200 min-w-0 flex-shrink max-w-xs">
-                  <div className="w-2 h-2 bg-success-500 rounded-full animate-bounce-subtle shadow-sm flex-shrink-0"></div>
-                  <File className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate" title={activeFile.file_name}>{activeFile.file_name}</span>
-                </div>
-              )}
             </div>
           </div>
           
@@ -2183,7 +2178,7 @@ const ChatPage: React.FC = () => {
                 <div key={message.id}>
                   {/* User message - standalone, aligned right */}
                   {message.role === 'user' && (
-                    <div className="flex justify-end mb-6">
+                    <div className={`flex justify-end mb-6 transition-all duration-300 ${businessMode ? 'mr-12' : ''}`}>
                       <div className="max-w-2xl">
                         <div className="bg-white text-gray-800 rounded-2xl px-5 py-3.5 shadow-medium hover:shadow-strong transition-all duration-200 border border-gray-200">
                           <div className="text-base leading-relaxed font-medium">
@@ -2303,37 +2298,35 @@ const ChatPage: React.FC = () => {
 
         {/* Input Area - Enhanced and optimized */}
         {currentSession && (
-          <div className="w-full px-6 py-6">
+          <div className="w-full px-4 py-4 bg-gradient-to-t from-gray-50/80 via-white to-white border-t border-gray-100/60">
             <div className="flex justify-center">
-              <div className="w-2/5 max-w-3xl">
-                <div className={`bg-gradient-to-br from-white via-slate-50 to-gray-50 rounded-2xl border-2 transition-all duration-300 overflow-hidden ${
-                  inputMessage.trim() 
-                    ? 'border-primary-300 shadow-medium shadow-primary-100/50 hover:shadow-strong hover:shadow-primary-200/60' 
-                    : 'border-slate-200 shadow-md hover:border-slate-300 hover:shadow-lg'
-                }`}>
+              <div className="w-full max-w-4xl">
+                <div className={`bg-white rounded-3xl border transition-all duration-500 ease-out overflow-hidden backdrop-blur-sm ${
+                  inputMessage.trim() || businessMode
+                    ? 'border-blue-200 shadow-xl shadow-blue-100/50 ring-1 ring-blue-100/50' 
+                    : 'border-gray-200 shadow-lg hover:border-gray-300 hover:shadow-xl'
+                } ${businessMode ? 'ring-2 ring-blue-200/30' : ''}`}>
                   <div className="flex items-center">
-                    {/* Upload Dataset Button - Left Side */}
+                    {/* Upload Button */}
                     <div className="flex items-center pl-3 pr-2">
                       <button
                         onClick={() => setShowUploadModal(true)}
-                        className="group relative overflow-hidden rounded-xl transition-all duration-300 bg-gradient-to-br from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-600/40 hover:scale-110 active:scale-95 p-3 flex items-center justify-center"
+                        className="group relative overflow-hidden rounded-full transition-all duration-300 bg-gradient-to-br from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-purple-600/50 hover:scale-110 active:scale-95 p-2.5 flex items-center justify-center"
                         title="Upload Dataset"
                       >
-                        {/* Animated background gradient */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
-                        
-                        {/* Enhanced icon with pulse effect */}
-                        <div className="relative z-10 flex items-center justify-center">
-                          <div className="absolute inset-0 bg-white/20 rounded-lg blur-sm group-hover:blur-md transition-all duration-300"></div>
-                          <PaperclipIcon className="w-5 h-5 relative transform transition-all duration-300 group-hover:rotate-12 group-hover:scale-110" />
-                        </div>
-                        
-                        {/* Subtle pulse ring */}
-                        <div className="absolute inset-0 rounded-xl ring-2 ring-white/0 group-hover:ring-white/30 transition-all duration-300"></div>
+                        <Plus className="w-4 h-4" />
                       </button>
                     </div>
 
                     <div className="flex-1 relative">
+                      {/* Business Mode Indicator */}
+                      {businessMode && (
+                        <div className="absolute left-1 top-1/2 transform -translate-y-1/2 flex items-center space-x-2 px-2 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full text-xs font-bold shadow-lg border border-blue-300 z-10">
+                          <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                          <span>BUSINESS</span>
+                        </div>
+                      )}
+                      
                       {/* Enhanced textarea with better positioning */}
                       <textarea
                         value={inputMessage}
@@ -2345,7 +2338,9 @@ const ChatPage: React.FC = () => {
                           }
                         }}
                         placeholder={`Ask ML Agent${activeFile ? ` about ${activeFile.file_name}` : ' anything about your data'}...`}
-                        className="w-full bg-transparent border-none resize-none focus:outline-none text-gray-800 placeholder-gray-500 text-base leading-[1.5] font-medium pl-1 pr-2 py-4 min-h-[56px] max-h-[120px] transition-all duration-200 text-left"
+                        className={`w-full bg-transparent border-none resize-none focus:outline-none text-gray-800 placeholder-gray-400 text-base leading-relaxed font-medium pr-5 py-5 min-h-[64px] max-h-[140px] transition-all duration-300 text-left ${
+                          businessMode ? 'pl-[120px]' : 'pl-5'
+                        }`}
                         rows={1}
                         onInput={(e) => {
                           const target = e.target as HTMLTextAreaElement;
@@ -2362,8 +2357,27 @@ const ChatPage: React.FC = () => {
                       }`}></div>
                     </div>
                     
-                    {/* Enhanced send button with better positioning */}
-                    <div className="flex items-center pl-2 pr-3">
+                    {/* Mode Toggle & Send Button */}
+                    <div className="flex items-center space-x-3 pl-2 pr-3">
+                      {/* Natural Mode Toggle */}
+                      <div className="flex items-center">
+                        <button
+                          onClick={() => setBusinessMode(!businessMode)}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                            businessMode 
+                              ? 'bg-blue-600 focus:ring-blue-500' 
+                              : 'bg-gray-300 focus:ring-gray-400'
+                          }`}
+                          title={businessMode ? 'Switch to Technical mode' : 'Switch to Business mode'}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-all duration-300 ${
+                              businessMode ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      
                       {/* Send Message Button */}
                       <button
                         onClick={sendMessage}
