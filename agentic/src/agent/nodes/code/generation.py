@@ -26,9 +26,9 @@ dependencies = [
     "optuna",
     "sentence_transformers",
     "gensim==4.3.2",
-    "matplotlib.pyplot",  # import matplotlib.pyplot as plt
+    # "matplotlib.pyplot",  # import matplotlib.pyplot as plt
     "seaborn",  # import seaborn as sns
-    "plotly.express",  # import plotly.express as px
+    # "plotly.express",  # import plotly.express as px
     "nltk",  # import nltk
     "spacy",  # import spacy
     "tqdm",  # from tqdm import tqdm

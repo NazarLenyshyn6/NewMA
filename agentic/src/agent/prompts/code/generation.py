@@ -43,6 +43,7 @@ code_generation_prompt = ChatPromptTemplate.from_messages(
             "- DO NOT modularize — generate only flat, step-by-step Python code.\n"
             "- DO NOT reference variables unless they have been clearly defined above.\n"
             "- Maintain consistent naming — no renaming of known variables.\n"
+            "- Never include any visualization.\n"
             "- **You MUST NEVER check for the existence, presence, or availability of the variable `df` in the global state — `df` is always guaranteed to exist and be available. DO NOT add any guards, conditionals, or validation regarding `df`'s presence.**\n\n"
             "**RESPECTING VARIABLE TYPES AND AVAILABILITY (EXTREMELY STRICT):**\n"
             "- BEFORE using any variable from the `history` summary, internally REFLECT ON and CONFIRM both:\n"
