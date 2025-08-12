@@ -3,6 +3,7 @@ const API_BASE_URL = 'http://localhost:8003';
 export const apiEndpoints = {
   login: `${API_BASE_URL}/api/v1/gateway/auth/login`,
   register: `${API_BASE_URL}/api/v1/gateway/auth/register`,
+  files: `${API_BASE_URL}/api/v1/gateway/files`,
   fileUpload: `${API_BASE_URL}/api/v1/gateway/files`,
   sessions: `${API_BASE_URL}/api/v1/gateway/sessions`,
   chat: `${API_BASE_URL}/api/v1/gateway/chat`,

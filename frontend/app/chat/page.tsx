@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info, Save, ChevronDown, ChevronRight, Move, Maximize2, Minimize2, RefreshCw } from 'lucide-react';
-import { apiEndpoints } from '@/lib/api';
+import { apiEndpoints, getAuthHeaders } from '@/lib/api';
 
 interface Session {
   id: string;
@@ -111,15 +111,6 @@ const ChatPage: React.FC = () => {
     }
   }, [router]);
 
-  // Get auth headers
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('access_token');
-    const tokenType = localStorage.getItem('token_type') || 'Bearer';
-    return {
-      'Authorization': `${tokenType} ${token}`,
-      'Content-Type': 'application/json',
-    };
-  };
 
   // Check if response indicates authentication failure
   const handleAuthError = useCallback((response: Response) => {
@@ -198,14 +189,14 @@ const ChatPage: React.FC = () => {
       console.log('🔄 Resending question:', lastUserMessage.content.substring(0, 50) + '...');
       
       // Try streaming endpoint
-      let response = await fetch(`http://localhost:8003/api/v1/gateway/chat/stream?question=${encodeURIComponent(lastUserMessage.content)}`, {
+      let response = await fetch(`${apiEndpoints.chat}/stream?question=${encodeURIComponent(lastUserMessage.content)}`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
 
       // If that fails, try with trailing slash
       if (!response.ok && (response.status === 404 || response.status === 405)) {
-        response = await fetch(`http://localhost:8003/api/v1/gateway/chat/stream/?question=${encodeURIComponent(lastUserMessage.content)}`, {
+        response = await fetch(`${apiEndpoints.chat}/stream/?question=${encodeURIComponent(lastUserMessage.content)}`, {
           method: 'GET',
           headers: getAuthHeaders(),
         });
@@ -269,13 +260,13 @@ const ChatPage: React.FC = () => {
         }
       } else {
         // Fallback to regular chat endpoint
-        let fallbackResponse = await fetch(`http://localhost:8003/api/v1/gateway/chat?question=${encodeURIComponent(lastUserMessage.content)}`, {
+        let fallbackResponse = await fetch(`${apiEndpoints.chat}?question=${encodeURIComponent(lastUserMessage.content)}`, {
           method: 'GET',
           headers: getAuthHeaders(),
         });
 
         if (!fallbackResponse.ok && (fallbackResponse.status === 404 || fallbackResponse.status === 405)) {
-          fallbackResponse = await fetch(`http://localhost:8003/api/v1/gateway/chat/?question=${encodeURIComponent(lastUserMessage.content)}`, {
+          fallbackResponse = await fetch(`${apiEndpoints.chat}/?question=${encodeURIComponent(lastUserMessage.content)}`, {
             method: 'GET',
             headers: getAuthHeaders(),
           });
@@ -332,7 +323,7 @@ const ChatPage: React.FC = () => {
   const shouldAutoCollapse = (codeId: string) => {
     if (!collapsedCodeBlocks.has(codeId)) {
       // Auto-collapse new code blocks
-      setCollapsedCodeBlocks(prev => new Set([...prev, codeId]));
+      setCollapsedCodeBlocks(prev => new Set(Array.from(prev).concat([codeId])));
       return true;
     }
     return collapsedCodeBlocks.has(codeId);
@@ -935,7 +926,7 @@ const ChatPage: React.FC = () => {
   // Load messages for a session
   const loadMessages = useCallback(async (sessionId: string) => {
     try {
-      const response = await fetch(`http://localhost:8003/api/v1/gateway/sessions/${sessionId}/messages`, {
+      const response = await fetch(`${apiEndpoints.sessions}/${sessionId}/messages`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -1104,7 +1095,7 @@ const ChatPage: React.FC = () => {
       
       // Try to provide helpful debugging info
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.log('🚨 Network error - API gateway may not be running on http://localhost:8003');
+        console.log('🚨 Network error - API gateway may not be running');
       }
       
       console.log('📝 Showing empty chat due to chat history service error');
@@ -1116,7 +1107,7 @@ const ChatPage: React.FC = () => {
   // Load sessions from API
   const loadSessions = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8003/api/v1/gateway/sessions', {
+      const response = await fetch(apiEndpoints.sessions, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -1138,7 +1129,7 @@ const ChatPage: React.FC = () => {
   const loadFiles = useCallback(async () => {
     setLoadingFiles(true);
     try {
-      const response = await fetch('http://localhost:8003/api/v1/gateway/files', {
+      const response = await fetch(apiEndpoints.files, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -1169,7 +1160,7 @@ const ChatPage: React.FC = () => {
       console.log(`Getting active file for session: ${currentSession.title}`);
       
       // Try the files/active endpoint first
-      let response = await fetch('http://localhost:8003/api/v1/gateway/files/active', {
+      let response = await fetch(`${apiEndpoints.files}/active`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -1211,7 +1202,7 @@ const ChatPage: React.FC = () => {
     
     try {
       // Try with trailing slash first (as documented)
-      let response = await fetch('http://localhost:8003/api/v1/gateway/files/active/', {
+      let response = await fetch(`${apiEndpoints.files}/active/`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -1222,7 +1213,7 @@ const ChatPage: React.FC = () => {
       // If that fails with 405, try without trailing slash
       if (!response.ok && response.status === 405) {
         console.log('POST /files/active/ failed with 405, trying without trailing slash...');
-        response = await fetch('http://localhost:8003/api/v1/gateway/files/active', {
+        response = await fetch(`${apiEndpoints.files}/active`, {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({
@@ -1297,7 +1288,7 @@ const ChatPage: React.FC = () => {
       formData.append('file_name', fileName.trim());
       formData.append('description', fileDescription.trim());
 
-      const response = await fetch('http://localhost:8003/api/v1/gateway/files', {
+      const response = await fetch(apiEndpoints.files, {
         method: 'POST',
         headers: {
           'Authorization': `${localStorage.getItem('token_type')} ${localStorage.getItem('access_token')}`,
@@ -1339,7 +1330,7 @@ const ChatPage: React.FC = () => {
     setNewSessionError('');
 
     try {
-      const response = await fetch('http://localhost:8003/api/v1/gateway/sessions', {
+      const response = await fetch(apiEndpoints.sessions, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -1361,7 +1352,7 @@ const ChatPage: React.FC = () => {
         localStorage.setItem('activeSessionTitle', newSession.title);
         
         try {
-          await fetch(`http://localhost:8003/api/v1/gateway/sessions/active/${newSession.title}`, {
+          await fetch(`${apiEndpoints.sessions}/active/${newSession.title}`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({
@@ -1395,7 +1386,7 @@ const ChatPage: React.FC = () => {
 
     try {
       console.log(`🔄 User clicked to switch to session: ${session.title}`);
-      const response = await fetch(`http://localhost:8003/api/v1/gateway/sessions/active/${session.title}`, {
+      const response = await fetch(`${apiEndpoints.sessions}/active/${session.title}`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -1409,32 +1400,49 @@ const ChatPage: React.FC = () => {
         // Set the current session first
         setCurrentSession(session);
         
+        // Store session info immediately
+        localStorage.setItem('activeSessionId', session.id);
+        localStorage.setItem('activeSessionTitle', session.title);
+        
+        // Load files and get active file BEFORE loading chat history
+        // This ensures chat history has the correct active file context
+        loadFiles();
+        await getActiveFile();
+        
         // ALWAYS load chat history when switching sessions - this is the key functionality
         console.log(`📚 Loading chat history for session: ${session.title}`);
         await loadChatHistory();
         
-        // Load other session data
-        loadFiles();
-        
-        // Store session info
-        localStorage.setItem('activeSessionId', session.id);
-        localStorage.setItem('activeSessionTitle', session.title);
-        
-        // Now get the active file for this session
-        await getActiveFile();
-        
         console.log(`🎉 Session switch complete for: ${session.title} - Chat history loaded`);
       } else {
         console.error('❌ Failed to set session as active on backend');
-        // Even if backend fails, still try to load chat history for better UX
+        // Even if backend fails, still try to load for better UX
         setCurrentSession(session);
+        localStorage.setItem('activeSessionId', session.id);
+        localStorage.setItem('activeSessionTitle', session.title);
+        
+        // Load files and active file first
+        loadFiles();
+        await getActiveFile();
+        
         console.log(`📚 Loading chat history despite backend error for session: ${session.title}`);
         await loadChatHistory();
       }
     } catch (error) {
       console.error('❌ Error switching session:', error);
-      // Fallback: still try to show the session with chat history
+      // Fallback: still try to show the session with proper context
       setCurrentSession(session);
+      localStorage.setItem('activeSessionId', session.id);
+      localStorage.setItem('activeSessionTitle', session.title);
+      
+      // Load files and active file first, even in error case
+      loadFiles();
+      try {
+        await getActiveFile();
+      } catch (activeFileError) {
+        console.error('Failed to get active file in fallback:', activeFileError);
+      }
+      
       console.log(`📚 Loading chat history in fallback mode for session: ${session.title}`);
       await loadChatHistory();
     }
@@ -1457,7 +1465,7 @@ const ChatPage: React.FC = () => {
     setDeletingSession(true);
     try {
       // Based on UI requirements: DELETE to /api/v1/gateway/sessions/{title}
-      const response = await fetch(`http://localhost:8003/api/v1/gateway/sessions/${sessionToDelete.title}`, {
+      const response = await fetch(`${apiEndpoints.sessions}/${sessionToDelete.title}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -1494,7 +1502,7 @@ const ChatPage: React.FC = () => {
     setLoadingDatasetInfo(true);
     try {
       // First set the file as active to get its detailed info
-      let response = await fetch('http://localhost:8003/api/v1/gateway/files/active/', {
+      let response = await fetch(`${apiEndpoints.files}/active/`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -1505,7 +1513,7 @@ const ChatPage: React.FC = () => {
       // If that fails with 405, try without trailing slash
       if (!response.ok && response.status === 405) {
         console.log('POST /files/active/ failed with 405 for dataset info, trying without trailing slash...');
-        response = await fetch('http://localhost:8003/api/v1/gateway/files/active', {
+        response = await fetch(`${apiEndpoints.files}/active`, {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({
@@ -1516,7 +1524,7 @@ const ChatPage: React.FC = () => {
 
       if (response.ok) {
         // Now get the active file details
-        const activeResponse = await fetch('http://localhost:8003/api/v1/gateway/files/active', {
+        const activeResponse = await fetch(`${apiEndpoints.files}/active`, {
           method: 'GET',
           headers: getAuthHeaders(),
         });
@@ -1558,7 +1566,7 @@ const ChatPage: React.FC = () => {
     setSaveMessage('');
 
     try {
-      const response = await fetch('http://localhost:8003/api/v1/gateway/chat/save', {
+      const response = await fetch(apiEndpoints.chatSave, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -1595,7 +1603,7 @@ const ChatPage: React.FC = () => {
     setDeletingFile(true);
     try {
       // Based on UI requirements: DELETE to /api/v1/gateway/files/{file_name}
-      const response = await fetch(`http://localhost:8003/api/v1/gateway/files/${fileToDelete.file_name}`, {
+      const response = await fetch(`${apiEndpoints.files}/${fileToDelete.file_name}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -1650,11 +1658,11 @@ const ChatPage: React.FC = () => {
     try {
       console.log('🚀 Starting streaming request for question:', currentQuestion.substring(0, 50) + '...');
       if (DEBUG_STREAMING) {
-        console.log('Starting streaming request to:', `http://localhost:8003/api/v1/gateway/chat/stream?question=${encodeURIComponent(currentQuestion)}`);
+        console.log('Starting streaming request to:', `${apiEndpoints.chat}/stream?question=${encodeURIComponent(currentQuestion)}`);
       }
       
       // Try streaming endpoint - first without trailing slash
-      let response = await fetch(`http://localhost:8003/api/v1/gateway/chat/stream?question=${encodeURIComponent(currentQuestion)}`, {
+      let response = await fetch(`${apiEndpoints.chat}/stream?question=${encodeURIComponent(currentQuestion)}`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -1662,7 +1670,7 @@ const ChatPage: React.FC = () => {
       // If that fails, try with trailing slash
       if (!response.ok && (response.status === 404 || response.status === 405)) {
         console.log(`Streaming endpoint failed with ${response.status}, trying with trailing slash...`);
-        response = await fetch(`http://localhost:8003/api/v1/gateway/chat/stream/?question=${encodeURIComponent(currentQuestion)}`, {
+        response = await fetch(`${apiEndpoints.chat}/stream/?question=${encodeURIComponent(currentQuestion)}`, {
           method: 'GET',
           headers: getAuthHeaders(),
         });
@@ -1753,7 +1761,7 @@ const ChatPage: React.FC = () => {
       } else {
         // Fallback to regular chat endpoint
         console.log(`❌ Streaming failed with status ${response.status}, falling back to regular chat endpoint`);
-        let fallbackResponse = await fetch(`http://localhost:8003/api/v1/gateway/chat?question=${encodeURIComponent(currentQuestion)}`, {
+        let fallbackResponse = await fetch(`${apiEndpoints.chat}?question=${encodeURIComponent(currentQuestion)}`, {
           method: 'GET',
           headers: getAuthHeaders(),
         });
@@ -1761,7 +1769,7 @@ const ChatPage: React.FC = () => {
         // If that fails, try with trailing slash
         if (!fallbackResponse.ok && (fallbackResponse.status === 404 || fallbackResponse.status === 405)) {
           console.log('Regular chat endpoint failed, trying with trailing slash...');
-          fallbackResponse = await fetch(`http://localhost:8003/api/v1/gateway/chat/?question=${encodeURIComponent(currentQuestion)}`, {
+          fallbackResponse = await fetch(`${apiEndpoints.chat}/?question=${encodeURIComponent(currentQuestion)}`, {
             method: 'GET',
             headers: getAuthHeaders(),
           });
@@ -1822,11 +1830,13 @@ const ChatPage: React.FC = () => {
         console.log(`Restoring active session: ${savedSession.title}`);
         setCurrentSession(savedSession);
         
-        // Load chat history for the restored session
+        // First get the active file for this restored session
+        // This ensures chat history loads with correct file context
+        await getActiveFile();
+        
+        // Then load chat history for the restored session
         await loadChatHistory();
         
-        // Ensure we get the active file for this restored session
-        await getActiveFile();
         console.log(`Session restoration complete for: ${savedSession.title}`);
       } else {
         console.log('Saved session not found, clearing localStorage');
