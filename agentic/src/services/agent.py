@@ -228,6 +228,21 @@ class AgentService:
                 storage_uri=storage_uri,
                 conversation_context=pickle.dumps(business_conversation_summary),
             )
+        conversation_history = agent_memory_service.get_conversation_memory(
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+        )
+        agent_memory_service.update_memory_cache(
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+            conversation_history=pickle.dumps(conversation_history + new_conversation),
+        )
             
 
     # @staticmethod
