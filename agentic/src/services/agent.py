@@ -17,6 +17,7 @@ from agents.nodes.technical.conversation import techical_conversation_node
 from agents.nodes.technical.reporting import techical_reporting_node
 from agents.nodes.business.conversation import business_conversation_node
 from agents.nodes.summarization.conversation.business import business_conversation_summarization_node
+from agents.nodes.summarization.conversation.technical import technical_conversation_summarization_node 
 from agents.nodes.summarization.parallel import parallel_summarization_node
 
 
@@ -59,6 +60,24 @@ class AgentService:
                     "answer": techical_conversation_node.get_steamed_tokens(),
                 }
             ]
+            conversation_summary = technical_conversation_summarization_node.run(
+                conversation=technical_conversation_summarization_node.get_steamed_tokens(),
+                db=db,
+                question=question,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+            )
+            agent_memory_service.update_memory_cache(
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+                conversation_context=pickle.dumps(conversation_summary),
+            )
+
         else:
             async for chunk in planning_node.arun(
                 question=question,
@@ -100,7 +119,6 @@ class AgentService:
                     yield chunk
             if persisted_variables is not None:
                 analysis_report = persisted_variables.get("analysis_report")
-                
                 async for chunk in techical_reporting_node.arun(
                     question=question,
                     analysis_report=analysis_report,
@@ -112,6 +130,7 @@ class AgentService:
                     storage_uri=storage_uri,
                 ):
                     yield chunk
+
                 summary = parallel_summarization_node.run(
                     db=db,
                     persisted_variables=[
@@ -124,7 +143,7 @@ class AgentService:
                     storage_uri=storage_uri,
                     code_generation_message=code_generation_node.get_steamed_tokens(),
                     conversation=planning_node.get_steamed_tokens()
-                    + techical_conversation_node.get_steamed_tokens(),
+                    + techical_reporting_node.get_steamed_tokens(),
                 )
                 agent_memory_service.update_memory_cache(
                     db=db,
@@ -148,7 +167,7 @@ class AgentService:
                     "answer": planning_node.get_steamed_tokens()
                     + code_generation_node.get_steamed_tokens()
                     + code_execution_node.get_steamed_tokens()
-                    + techical_conversation_node.get_steamed_tokens(),
+                    + techical_reporting_node.get_steamed_tokens(),
                 }
             ]
         conversation_history = agent_memory_service.get_conversation_memory(
@@ -166,7 +185,7 @@ class AgentService:
             storage_uri=storage_uri,
             conversation_history=pickle.dumps(conversation_history + new_conversation),
         )
-                  
+   
                     
     @staticmethod
     async def business_chat_stream(
