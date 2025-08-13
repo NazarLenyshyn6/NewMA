@@ -2318,12 +2318,22 @@ const ChatPage: React.FC = () => {
                       </button>
                     </div>
 
+
                     <div className="flex-1 relative">
                       {/* Business Mode Indicator */}
                       {businessMode && (
-                        <div className="absolute left-1 top-1/2 transform -translate-y-1/2 flex items-center space-x-2 px-2 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full text-xs font-bold shadow-lg border border-blue-300 z-10">
+                        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 flex items-center space-x-2 px-2 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full text-xs font-bold shadow-lg border border-blue-300 z-10 group">
                           <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
                           <span>BUSINESS</span>
+                          <button
+                            onClick={() => setBusinessMode(false)}
+                            className="ml-1 w-4 h-4 flex items-center justify-center hover:bg-white/20 rounded-full transition-all duration-200"
+                            title="Turn off Business mode"
+                          >
+                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
                         </div>
                       )}
                       
@@ -2339,7 +2349,7 @@ const ChatPage: React.FC = () => {
                         }}
                         placeholder={`Ask ML Agent${activeFile ? ` about ${activeFile.file_name}` : ' anything about your data'}...`}
                         className={`w-full bg-transparent border-none resize-none focus:outline-none text-gray-800 placeholder-gray-400 text-base leading-relaxed font-medium pr-5 py-5 min-h-[64px] max-h-[140px] transition-all duration-300 text-left ${
-                          businessMode ? 'pl-[120px]' : 'pl-5'
+                          businessMode ? 'pl-[140px]' : 'pl-6'
                         }`}
                         rows={1}
                         onInput={(e) => {
@@ -2357,26 +2367,25 @@ const ChatPage: React.FC = () => {
                       }`}></div>
                     </div>
                     
-                    {/* Mode Toggle & Send Button */}
-                    <div className="flex items-center space-x-3 pl-2 pr-3">
-                      {/* Natural Mode Toggle */}
-                      <div className="flex items-center">
-                        <button
-                          onClick={() => setBusinessMode(!businessMode)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                            businessMode 
-                              ? 'bg-blue-600 focus:ring-blue-500' 
-                              : 'bg-gray-300 focus:ring-gray-400'
+                    {/* Business Mode & Send Button */}
+                    <div className="flex items-center space-x-2 pl-1 pr-3">
+                      
+                      {/* Business Mode Toggle Button */}
+                      <button
+                        onClick={() => setBusinessMode(!businessMode)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                          businessMode 
+                            ? 'bg-blue-600 focus:ring-blue-500' 
+                            : 'bg-gray-300 focus:ring-gray-400'
+                        }`}
+                        title={businessMode ? 'Switch to Technical mode' : 'Switch to Business mode'}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-all duration-300 ${
+                            businessMode ? 'translate-x-6' : 'translate-x-1'
                           }`}
-                          title={businessMode ? 'Switch to Technical mode' : 'Switch to Business mode'}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-all duration-300 ${
-                              businessMode ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
+                        />
+                      </button>
                       
                       {/* Send Message Button */}
                       <button
@@ -2993,6 +3002,7 @@ const ChatPage: React.FC = () => {
           backdrop-filter: blur(20px);
         }
       `}</style>
+
     </div>
   );
 };

@@ -5,15 +5,6 @@ import pickle
 
 from sqlalchemy.orm import Session
 
-# from agent.nodes.decision import decision_node
-# from agent.nodes.responses.contextual import contextual_response_node
-# from agent.nodes.planning import planning_node
-# from agent.nodes.code.generation import code_generation_node
-# from agent.nodes.code.execution import code_execution_node
-# from agent.nodes.responses.techical import techical_response_node
-# from agent.nodes.code.debagging import code_debagging_node
-# from agent.nodes.summarization.conversation import conversation_summarization_node
-# from agent.nodes.summarization.parallel import parallel_summarization_node
 from services.memory import agent_memory_service
 
 
@@ -25,6 +16,8 @@ from agents.nodes.technical.code.execution import code_execution_node
 from agents.nodes.technical.conversation import techical_conversation_node
 from agents.nodes.technical.reporting import techical_reporting_node
 from agents.nodes.business.conversation import business_conversation_node
+from agents.nodes.summarization.conversation.business import business_conversation_summarization_node
+from agents.nodes.summarization.parallel import parallel_summarization_node
 
 
 
@@ -119,6 +112,61 @@ class AgentService:
                     storage_uri=storage_uri,
                 ):
                     yield chunk
+                summary = parallel_summarization_node.run(
+                    db=db,
+                    persisted_variables=[
+                        variable for variable in persisted_variables.keys()
+                    ],
+                    question=question,
+                    user_id=user_id,
+                    session_id=session_id,
+                    file_name=file_name,
+                    storage_uri=storage_uri,
+                    code_generation_message=code_generation_node.get_steamed_tokens(),
+                    conversation=planning_node.get_steamed_tokens()
+                    + techical_conversation_node.get_steamed_tokens(),
+                )
+                agent_memory_service.update_memory_cache(
+                    db=db,
+                    user_id=user_id,
+                    session_id=session_id,
+                    file_name=file_name,
+                    storage_uri=storage_uri,
+                    conversation_context=pickle.dumps(
+                        summary["conversation_memory"].content
+                    ),
+                    code_context=pickle.dumps(summary["code_memory"].content),
+                    persisted_variables=pickle.dumps(persisted_variables),
+                )
+
+            else:
+                yield "Unexptexted error happend, try again."
+
+            new_conversation = [
+                {
+                    "question": question,
+                    "answer": planning_node.get_steamed_tokens()
+                    + code_generation_node.get_steamed_tokens()
+                    + code_execution_node.get_steamed_tokens()
+                    + techical_conversation_node.get_steamed_tokens(),
+                }
+            ]
+        conversation_history = agent_memory_service.get_conversation_memory(
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+        )
+        agent_memory_service.update_memory_cache(
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+            conversation_history=pickle.dumps(conversation_history + new_conversation),
+        )
+                  
                     
     @staticmethod
     async def business_chat_stream(
@@ -140,6 +188,27 @@ class AgentService:
                 storage_uri=storage_uri,
             ):
                 yield chunk
+        new_conversation = [{
+                    "question": question,
+                    "answer": business_conversation_node.get_steamed_tokens(),
+                }]
+        business_conversation_summary = business_conversation_summarization_node.run(
+                conversation=business_conversation_node.get_steamed_tokens(),
+                db=db,
+                question=question,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+            )
+        agent_memory_service.update_memory_cache(
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                file_name=file_name,
+                storage_uri=storage_uri,
+                conversation_context=pickle.dumps(business_conversation_summary),
+            )
             
 
     # @staticmethod
