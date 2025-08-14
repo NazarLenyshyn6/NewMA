@@ -10,7 +10,6 @@ from agents.nodes.base import BaseNode
 from services.memory import agent_memory_service
 
 
-
 class RoutingNode(BaseNode):
     """..."""
 
@@ -47,4 +46,9 @@ class RoutingNode(BaseNode):
         **kwargs
     ): ...
 
-routing_node = RoutingNode(model=routing_model, prompt=routing_prompt,memory=agent_memory_service,)
+
+routing_node = RoutingNode(
+    model=routing_model,
+    prompt=routing_prompt,
+    memory=agent_memory_service,
+)

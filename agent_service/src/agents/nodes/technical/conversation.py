@@ -3,6 +3,7 @@
 from typing import override, Optional
 from uuid import UUID
 import pickle
+import json
 
 from sqlalchemy.orm import Session
 
@@ -53,6 +54,7 @@ class TechicalConversationNode(BaseNode):
         ):
             chunk = chunk.content
             self._token_buffer.append(chunk)
+            chunk = f"data: {json.dumps({'type': 'text', 'data': chunk})}\n\n"
             yield chunk
 
 

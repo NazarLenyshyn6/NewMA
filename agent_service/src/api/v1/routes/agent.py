@@ -19,7 +19,7 @@ async def chat_stream(
     chat_request: ChatRequest,
     db: Session = Depends(db_manager.get_db),
 ):
-    stream = AgentService.techical_chat_stream(
+    stream = AgentService.technical_chat_stream(
         question=chat_request.question,
         db=db,
         user_id=chat_request.user_id,
@@ -35,7 +35,7 @@ async def chat_stream(
     chat_request: ChatRequest,
     db: Session = Depends(db_manager.get_db),
 ):
-    stream = AgentService.techical_chat_stream(
+    stream = AgentService.technical_chat_stream(
         question=chat_request.question,
         db=db,
         user_id=chat_request.user_id,

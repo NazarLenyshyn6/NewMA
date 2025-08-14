@@ -57,19 +57,19 @@ class AgentClient(BaseClient):
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream("POST", url, json=payload) as response:
                 response.raise_for_status()
-                async for chunk in response.aiter_bytes(chunk_size=1):
+                async for chunk in response.aiter_text():
                     if chunk:
                         yield chunk
                         
     @staticmethod
-    async def techical_chat_stream(
+    async def technical_chat_stream(
         question: str,
         user_id: int,
         session_id: UUID,
         file_name: str,
         storage_uri: str,
         dataset_summary: str,
-        url: str = "http://127.0.0.1:8005/api/v1/chat/stream/techical",
+        url: str = "http://127.0.0.1:8005/api/v1/chat/stream/technical",
     ) -> AsyncGenerator[str, None]:
         """Stream chat response from agent service."""
         payload = {
@@ -84,7 +84,7 @@ class AgentClient(BaseClient):
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream("POST", url, json=payload) as response:
                 response.raise_for_status()
-                async for chunk in response.aiter_bytes(chunk_size=1):
+                async for chunk in response.aiter_text():
                     if chunk:
                         yield chunk
                         
@@ -112,7 +112,7 @@ class AgentClient(BaseClient):
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream("POST", url, json=payload) as response:
                 response.raise_for_status()
-                async for chunk in response.aiter_bytes(chunk_size=1):
+                async for chunk in response.aiter_text():
                     if chunk:
                         yield chunk
 

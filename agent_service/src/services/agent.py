@@ -1,5 +1,6 @@
 """..."""
 
+import json
 from uuid import UUID
 import pickle
 
@@ -16,16 +17,19 @@ from agents.nodes.technical.code.execution import code_execution_node
 from agents.nodes.technical.conversation import techical_conversation_node
 from agents.nodes.technical.reporting import techical_reporting_node
 from agents.nodes.business.conversation import business_conversation_node
-from agents.nodes.summarization.conversation.business import business_conversation_summarization_node
-from agents.nodes.summarization.conversation.technical import technical_conversation_summarization_node 
+from agents.nodes.summarization.conversation.business import (
+    business_conversation_summarization_node,
+)
+from agents.nodes.summarization.conversation.technical import (
+    technical_conversation_summarization_node,
+)
 from agents.nodes.summarization.parallel import parallel_summarization_node
 
 
-
 class AgentService:
-    
+
     @staticmethod
-    async def techical_chat_stream(
+    async def technical_chat_stream(
         question: str,
         db: Session,
         user_id: int,
@@ -103,7 +107,7 @@ class AgentService:
             async for chunk in code_execution_node.arun(
                 question=question,
                 dataset_summary=dataset_summary,
-                code_generation_message=code_generation_node.get_steamed_tokens(),
+                code_generation_message=code_generation_node.get_steamed_tokens_text(),
                 db=db,
                 user_id=user_id,
                 session_id=session_id,
@@ -119,6 +123,24 @@ class AgentService:
                     yield chunk
             if persisted_variables is not None:
                 analysis_report = persisted_variables.get("analysis_report")
+
+                if "images" in persisted_variables:
+                    print(
+                        f"🖼️ BACKEND: Found {len(persisted_variables['images'])} images to send"
+                    )
+                    for i, img in enumerate(persisted_variables["images"]):
+                        print(
+                            f"🖼️ BACKEND: Processing image {i+1}, base64 length: {len(img)}"
+                        )
+                        print(f"🖼️ BACKEND: Base64 preview: {img[:100]}...")
+
+                        img_json = (
+                            f"data: {json.dumps({'type': 'image', 'data': img})}\n\n"
+                        )
+
+                        print(f"🖼️ BACKEND: Sending SSE message: {img_json[:200]}...")
+                        yield img_json
+
                 async for chunk in techical_reporting_node.arun(
                     question=question,
                     analysis_report=analysis_report,
@@ -130,6 +152,8 @@ class AgentService:
                     storage_uri=storage_uri,
                 ):
                     yield chunk
+
+                yield f"data: {json.dumps({'type': 'end'})}\n\n"
 
                 summary = parallel_summarization_node.run(
                     db=db,
@@ -159,7 +183,8 @@ class AgentService:
                 )
 
             else:
-                yield "Unexptexted error happend, try again."
+                # yield "Unexptexted error happend, try again."
+                yield f"data: {json.dumps({'type': 'error', 'data': 'Unexpected error happened'})}\n\n"
 
             new_conversation = [
                 {
@@ -185,8 +210,7 @@ class AgentService:
             storage_uri=storage_uri,
             conversation_history=pickle.dumps(conversation_history + new_conversation),
         )
-   
-                    
+
     @staticmethod
     async def business_chat_stream(
         question: str,
@@ -199,35 +223,37 @@ class AgentService:
     ):
         """..."""
         async for chunk in business_conversation_node.arun(
-                question=question,
-                db=db,
-                user_id=user_id,
-                session_id=session_id,
-                file_name=file_name,
-                storage_uri=storage_uri,
-            ):
-                yield chunk
-        new_conversation = [{
-                    "question": question,
-                    "answer": business_conversation_node.get_steamed_tokens(),
-                }]
+            question=question,
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+        ):
+            yield chunk
+        new_conversation = [
+            {
+                "question": question,
+                "answer": business_conversation_node.get_steamed_tokens(),
+            }
+        ]
         business_conversation_summary = business_conversation_summarization_node.run(
-                conversation=business_conversation_node.get_steamed_tokens(),
-                db=db,
-                question=question,
-                user_id=user_id,
-                session_id=session_id,
-                file_name=file_name,
-                storage_uri=storage_uri,
-            )
+            conversation=business_conversation_node.get_steamed_tokens(),
+            db=db,
+            question=question,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+        )
         agent_memory_service.update_memory_cache(
-                db=db,
-                user_id=user_id,
-                session_id=session_id,
-                file_name=file_name,
-                storage_uri=storage_uri,
-                conversation_context=pickle.dumps(business_conversation_summary),
-            )
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            file_name=file_name,
+            storage_uri=storage_uri,
+            conversation_context=pickle.dumps(business_conversation_summary),
+        )
         conversation_history = agent_memory_service.get_conversation_memory(
             db=db,
             user_id=user_id,
@@ -243,7 +269,6 @@ class AgentService:
             storage_uri=storage_uri,
             conversation_history=pickle.dumps(conversation_history + new_conversation),
         )
-            
 
     # @staticmethod
     # async def chat_stream(

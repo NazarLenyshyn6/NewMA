@@ -36,7 +36,7 @@ def chat(
 
 
 @router.get("/stream")
-async def chat_stream(
+async def chat_stream_default(
     question: str,
     token: str = Depends(oauth2_scheme),
 ):
@@ -55,12 +55,11 @@ async def chat_stream(
     )
 
     # Return StreamingResponse with media_type text/plain for real-time streaming
-    return StreamingResponse(stream, media_type="text/plain")
-
+    return StreamingResponse(stream, media_type="text/event-stream")
 
 
 @router.get("/stream/technical")
-async def chat_stream(
+async def chat_stream_technical(
     question: str,
     token: str = Depends(oauth2_scheme),
 ):
@@ -69,7 +68,7 @@ async def chat_stream(
     active_file = FileClient.get_active_file(token=token, session=session_id)
 
     # Call async streaming method of your client
-    stream = AgentClient.chat_stream(
+    stream = AgentClient.technical_chat_stream(
         question=question,
         user_id=user_id,
         session_id=session_id,
@@ -79,11 +78,11 @@ async def chat_stream(
     )
 
     # Return StreamingResponse with media_type text/plain for real-time streaming
-    return StreamingResponse(stream, media_type="text/plain")
+    return StreamingResponse(stream, media_type="text/event-stream")
 
 
 @router.get("/stream/business")
-async def chat_stream(
+async def chat_stream_business(
     question: str,
     token: str = Depends(oauth2_scheme),
 ):
@@ -102,7 +101,7 @@ async def chat_stream(
     )
 
     # Return StreamingResponse with media_type text/plain for real-time streaming
-    return StreamingResponse(stream, media_type="text/plain")
+    return StreamingResponse(stream, media_type="text/event-stream")
 
 
 @router.get("/history")

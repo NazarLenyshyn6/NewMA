@@ -3,7 +3,9 @@
 from typing import override, Optional, List
 from uuid import UUID
 import pickle
+import json
 
+from pydantic import PrivateAttr
 from sqlalchemy.orm import Session
 
 from agents.prompts.technical.code.debagging import code_debugging_prompt
@@ -15,6 +17,11 @@ from services.memory import agent_memory_service
 
 class CodeDebaggingNode(BaseNode):
     """..."""
+
+    _token_buffer_text: list = PrivateAttr(default_factory=list)
+
+    def get_steamed_tokens_text(self) -> str:
+        return "".join(self._token_buffer_text)
 
     @override
     def run(
@@ -71,11 +78,13 @@ class CodeDebaggingNode(BaseNode):
                 "error_message": error_message,
                 "code_context": history,
                 "dataset_summary": dataset_summary,
-                "persisted_variables": persisted_variables
+                "persisted_variables": persisted_variables,
             }
         ):
             chunk = chunk.content
+            self._token_buffer_text.append(chunk)
             self._token_buffer.append(chunk)
+            chunk = f"data: {json.dumps({'type': 'text', 'data': chunk})}\n\n"
             yield chunk
 
 

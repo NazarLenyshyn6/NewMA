@@ -3,7 +3,9 @@
 from typing import override, Optional, List
 from uuid import UUID
 import pickle
+import json
 
+from pydantic import PrivateAttr
 from sqlalchemy.orm import Session
 
 from agents.nodes.base import BaseNode
@@ -30,7 +32,7 @@ dependencies = [
     "gensim==4.3.2",
     # "matplotlib.pyplot",  # import matplotlib.pyplot as plt
     "seaborn",  # import seaborn as sns
-    # "plotly.express",  # import plotly.express as px
+    "plotly.express",  # import plotly.express as px
     "nltk",  # import nltk
     "spacy",  # import spacy
     "tqdm",  # from tqdm import tqdm
@@ -40,6 +42,11 @@ dependencies = [
 
 class CodeGenerationNode(BaseNode):
     """..."""
+
+    _token_buffer_text: list = PrivateAttr(default_factory=list)
+
+    def get_steamed_tokens_text(self) -> str:
+        return "".join(self._token_buffer_text)
 
     @override
     def run(
@@ -93,11 +100,14 @@ class CodeGenerationNode(BaseNode):
                 "dataset_summary": dataset_summary,
                 "dependencies": dependencies,
                 "question": question,
-                "persisted_variables": persisted_variables
+                "persisted_variables": persisted_variables,
             }
         ):
             chunk = chunk.content
+            # Stream clean text content directly - no JSON wrapping
+            self._token_buffer_text.append(chunk)
             self._token_buffer.append(chunk)
+            chunk = f"data: {json.dumps({'type': 'text', 'data': chunk})}\n\n"
             yield chunk
 
 

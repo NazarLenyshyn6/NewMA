@@ -2,7 +2,7 @@
 
 from typing import override, Optional, List
 from uuid import UUID
-import pickle
+import json
 from pprint import pformat
 
 from sqlalchemy.orm import Session
@@ -34,6 +34,7 @@ class TechicalResponseNode(BaseNode):
             lines.append("")  # Blank line for spacing
 
         return "\n".join(lines)
+
     @override
     def run(
         self,
@@ -66,6 +67,7 @@ class TechicalResponseNode(BaseNode):
         ):
             chunk = chunk.content
             self._token_buffer.append(chunk)
+            chunk = f"data: {json.dumps({'type': 'text', 'data': chunk})}\n\n"
             yield chunk
 
 

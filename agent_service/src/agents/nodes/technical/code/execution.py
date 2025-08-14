@@ -6,6 +6,7 @@ from types import ModuleType
 import importlib
 from uuid import UUID
 import pickle
+import json
 
 
 from pydantic import PrivateAttr
@@ -88,7 +89,7 @@ class CodeExecutionNode(BaseNode):
             self._token_buffer.extend(code_debagging_node._token_buffer)
 
         if current_attempt > max_attempts:
-            yield "Failed"
+            yield "Failed"  # Stream clean error message
             return
 
         persisted_variables_history = pickle.loads(
@@ -130,7 +131,9 @@ class CodeExecutionNode(BaseNode):
                 storage_uri=storage_uri,
             ):
                 yield chunk
-            fixed_code_generation_message = code_debagging_node.get_steamed_tokens()
+            fixed_code_generation_message = (
+                code_debagging_node.get_steamed_tokens_text()
+            )
             async for chunk in self.arun(
                 question=question,
                 dataset_summary=dataset_summary,
