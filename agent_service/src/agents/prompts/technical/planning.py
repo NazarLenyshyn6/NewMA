@@ -10,7 +10,6 @@ planning_prompt = ChatPromptTemplate.from_messages(
     [
         SystemMessagePromptTemplate.from_template(
             """
-
 The user is currently working on **technical machine learning and data analysis tasks** involving data that is **already available** within the system.
 
 __
@@ -44,11 +43,12 @@ __
 
 7. End with a smooth transition to execution: “Alright, we’ve fully detailed this step—let’s turn it into code.”
 
-8. **Visualization Rule** — Only if the user explicitly requests visualization:  
-   - Plan **exactly one visualization**, representing **the single most important insight** from the subtask.  
-   - Do **not plan multiple images**, charts, or stages.  
-   - Keep visualization planning strictly **isolated from the main subtask plan**.  
-   - Focus entirely on this one image: what it should show, why it is critical, and how it supports the subtask analysis.
+8. **Visualization Rules (Strict Mode)** —  
+   - Plan a visualization **only if the user explicitly requests a visual or visualization**.  
+   - Before planning, **ask exactly what the user wants to see** in the visualization.  
+   - Plan **exactly one visualization**, representing **the single most important insight** for this subtask.  
+   - Keep the visualization **as minimal as possible** because it will be displayed in a single chart/chat bubble — avoid multiple metrics, plots, or combined views.  
+   - If no explicit visualization request is made, skip visualization planning entirely.
 
 __
 
@@ -66,8 +66,8 @@ __
 - Number or bullet each granular action.  
 - Avoid fluff — focus on clarity, precision, and actionable detail.  
 - Do **not include code**.  
-- If visualization is requested, plan **only one visualization** with extreme focus on its importance.
-        """
+- If visualization is requested, plan **only one visualization** with extreme focus on its importance and minimalism.
+            """
         ),
         HumanMessagePromptTemplate.from_template(
             "User question:\n{question}\n\n"

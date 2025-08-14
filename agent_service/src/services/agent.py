@@ -124,22 +124,27 @@ class AgentService:
             if persisted_variables is not None:
                 analysis_report = persisted_variables.get("analysis_report")
 
-                if "images" in persisted_variables:
-                    print(
-                        f"🖼️ BACKEND: Found {len(persisted_variables['images'])} images to send"
-                    )
-                    for i, img in enumerate(persisted_variables["images"]):
-                        print(
-                            f"🖼️ BACKEND: Processing image {i+1}, base64 length: {len(img)}"
-                        )
-                        print(f"🖼️ BACKEND: Base64 preview: {img[:100]}...")
+                if "image_base64" in persisted_variables:
+                    img = persisted_variables["image_base64"]
+                    img_json = f"data: {json.dumps({'type': 'image', 'data': img})}\n\n"
+                    yield img_json
 
-                        img_json = (
-                            f"data: {json.dumps({'type': 'image', 'data': img})}\n\n"
-                        )
+                # if "images" in persisted_variables:
+                #     print(
+                #         f"🖼️ BACKEND: Found {len(persisted_variables['images'])} images to send"
+                #     )
+                #     for i, img in enumerate(persisted_variables["images"]):
+                #         print(
+                #             f"🖼️ BACKEND: Processing image {i+1}, base64 length: {len(img)}"
+                #         )
+                #         print(f"🖼️ BACKEND: Base64 preview: {img[:100]}...")
 
-                        print(f"🖼️ BACKEND: Sending SSE message: {img_json[:200]}...")
-                        yield img_json
+                #         img_json = (
+                #             f"data: {json.dumps({'type': 'image', 'data': img})}\n\n"
+                #         )
+
+                #         print(f"🖼️ BACKEND: Sending SSE message: {img_json[:200]}...")
+                #         yield img_json
 
                 async for chunk in techical_reporting_node.arun(
                     question=question,
