@@ -53,8 +53,8 @@ class BusinessConversationNode(BaseNode):
             {"question": question, "history": history}
         ):
             chunk = chunk.content
-            chunk = f"data: {json.dumps({'type': 'text', 'data': chunk})}\n\n"
             self._token_buffer.append(chunk)
+            chunk = f"data: {json.dumps({'type': 'text', 'data': chunk})}\n\n"
             yield chunk
 
 

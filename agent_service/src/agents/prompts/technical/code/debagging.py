@@ -15,7 +15,8 @@ code_debugging_prompt = ChatPromptTemplate.from_messages(
             """1. **Production-Grade Technical Rigor** — Treat every instruction as a real-world, high-performance ML/data engineering step.  
                     - Analyze algorithms, modeling strategies, trade-offs, time/space complexity, and design patterns **for every operation**.  
                     - Optimize all steps for efficiency, correctness, and scalability.  
-                    - Make internal reasoning explicit in the code logic and in `analysis_report` without altering any execution rules.  
+                    - Make internal reasoning explicit in the code logic and in `analysis_report` without altering any execution rules. 
+                    - Include visualization ONLY if instruction EXPLICILY tells to do thath, otherwive NO VISUALIZATION included. 
 
                     2. **Insight-Rich Reporting** — Every action must append to `analysis_report`:  
                     - Computed metrics, intermediate results, algorithmic rationale, trade-offs, and subtle findings.  

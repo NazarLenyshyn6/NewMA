@@ -77,48 +77,14 @@ const ChatPage: React.FC = () => {
   const [savingConversation, setSavingConversation] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [businessMode, setBusinessMode] = useState(false);
-  const [messageContent, setMessageContent] = useState<{[messageId: string]: Array<{type: 'text' | 'image', data: string}>}>({});
-  const [currentStreamingImage, setCurrentStreamingImage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Debug mode for development - always enabled for streaming debugging
   const DEBUG_STREAMING = true;
   
-  
   // Python code display limit (characters)
   const PYTHON_CODE_CHAR_LIMIT = 500;
-
-  // Functions to handle streaming content
-  const appendText = (text: string, messageId: string) => {
-    setMessages(prev => prev.map(msg => 
-      msg.id === messageId 
-        ? { ...msg, content: msg.content + text }
-        : msg
-    ));
-  };
-
-  // LIVE MULTI-MODAL: Decode and display image instantly during streaming
-  const immediateImageDisplay = (base64String: string, messageId: string) => {
-    console.log('🖼️ LIVE DECODE: Base64 length:', base64String.length);
-    
-    // Convert to browser-readable data URL
-    const dataURL = `data:image/png;base64,${base64String}`;
-    
-    // Update images state for IMMEDIATE display
-    setMessageImages(prev => ({
-      ...prev,
-      [messageId]: [...(prev[messageId] || []), dataURL]
-    }));
-    
-    // Scroll to show the new image immediately
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-    
-    console.log('🖼️ LIVE DECODE: Image displayed live during streaming!');
-  };
-
 
   // Logout function
   const handleLogout = useCallback(() => {
@@ -133,7 +99,6 @@ const ChatPage: React.FC = () => {
       setSessions([]);
       setCurrentSession(null);
       setMessages([]);
-      setMessageImages({});
       setFiles([]);
       setActiveFile(null);
       setInputMessage('');
@@ -280,58 +245,12 @@ const ChatPage: React.FC = () => {
             }
 
             const chunk = decoder.decode(value, { stream: true });
+            currentContent += chunk;
             
-            // UNIFIED JSON PARSING - Backend sends ALL data as: data: {"type": "text/image", "data": "content"}
-            const lines = chunk.split('\n');
-            
-            for (const line of lines) {
-              if (line.startsWith('data: {')) {
-                try {
-                  const jsonStr = line.substring(6); // Remove "data: " prefix
-                  const msg = JSON.parse(jsonStr);
-                  
-                  // Handle different message types - build inline content
-                  if (msg.type === "text") {
-                    if (msg.data) {
-                      currentContent += msg.data;
-                      // Update inline content - preserve full text formatting
-                      setMessageContent(prev => {
-                        const existing = prev[currentMessageId] || [];
-                        const lastItem = existing[existing.length - 1];
-                        if (lastItem && lastItem.type === 'text') {
-                          // Update the complete text content (not just append)
-                          lastItem.data = currentContent;
-                          return { ...prev, [currentMessageId]: [...existing] };
-                        } else {
-                          // Create new text block with current complete content
-                          return { ...prev, [currentMessageId]: [...existing, {type: 'text', data: currentContent}] };
-                        }
-                      });
-                    }
-                  } else if (msg.type === "image") {
-                    if (msg.data && currentMessageId) {
-                      console.log('🖼️ LIVE: Showing image RIGHT NOW!');
-                      // Show image ONLY while receiving it - pure live streaming
-                      const dataURL = `data:image/png;base64,${msg.data}`;
-                      setCurrentStreamingImage(dataURL);
-                    }
-                  } else if (msg.type === "end") {
-                    console.log('✅ Stream finished');
-                    // Clear any live image when streaming ends
-                    setCurrentStreamingImage(null);
-                    break;
-                  }
-                } catch (parseError) {
-                  console.error('JSON parse error:', parseError);
-                }
-              }
-            }
-            
-            // Update message with clean text content (remove image markdown since images are handled separately)
-            const cleanTextContent = currentContent.replace(/!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^)]+)\)/g, '').trim();
+            // Update the single assistant message in real-time
             setMessages(prev => prev.map(msg => 
               msg.id === currentMessageId 
-                ? { ...msg, content: cleanTextContent }
+                ? { ...msg, content: currentContent }
                 : msg
             ));
             
@@ -426,135 +345,87 @@ const ChatPage: React.FC = () => {
   };
 
 
-  // Parse message content to detect code blocks - images are handled separately
+  // Parse message content to detect code blocks - ONLY Python gets special treatment
   const parseMessageContent = (content: string) => {
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
     const parts = [];
     let lastIndex = 0;
-    
-    // Remove any remaining image markdown (shouldn't exist but failsafe)
-    const cleanContent = content.replace(/!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^)]+)\)/g, '').trim();
-    
-    // Parse code blocks only since images are handled separately
-    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
-    
-    // Process code blocks only
-    const allMatches = [];
     let match;
-    
-    // Collect code block matches from clean content
-    codeBlockRegex.lastIndex = 0;
-    while ((match = codeBlockRegex.exec(cleanContent)) !== null) {
-      allMatches.push({
-        type: 'code',
-        match: match,
-        index: match.index,
-        length: match[0].length
-      });
-    }
-    
-    // Sort matches by index
-    allMatches.sort((a, b) => a.index - b.index);
-    
-    // Process matches in order
-    for (const matchItem of allMatches) {
-      // Add text before this match
-      if (matchItem.index > lastIndex) {
+
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
         parts.push({
           type: 'text',
-          content: cleanContent.slice(lastIndex, matchItem.index)
+          content: content.slice(lastIndex, match.index)
         });
       }
-      
-      // Only handle code blocks since images are handled separately
-      if (matchItem.type === 'code') {
-        const match = matchItem.match;
-        const language = match[1] || '';
-        
-        // Only treat as special code block if it's explicitly Python
-        if (language.toLowerCase() === 'python') {
-          parts.push({
-            type: 'code',
-            language: 'python',
-            content: match[2].trim()
-          });
-        } else {
-          // Treat non-Python code blocks as regular text (just remove the ``` markers)
-          parts.push({
-            type: 'text',
-            content: match[2].trim()
-          });
-        }
+
+      // Only treat as special code block if it's explicitly Python
+      const language = match[1] || '';
+      if (language.toLowerCase() === 'python') {
+        parts.push({
+          type: 'code',
+          language: 'python',
+          content: match[2].trim()
+        });
+      } else {
+        // Treat non-Python code blocks as regular text (just remove the ``` markers)
+        parts.push({
+          type: 'text',
+          content: match[2].trim()
+        });
       }
-      
-      lastIndex = matchItem.index + matchItem.length;
+
+      lastIndex = match.index + match[0].length;
     }
 
-    if (lastIndex < cleanContent.length) {
+    if (lastIndex < content.length) {
       parts.push({
         type: 'text',
-        content: cleanContent.slice(lastIndex)
+        content: content.slice(lastIndex)
       });
     }
 
-    return parts.length > 0 ? parts : [{ type: 'text', content: cleanContent }];
+    return parts.length > 0 ? parts : [{ type: 'text', content }];
   };
 
-  // Parse streaming content - images handled separately
+  // Parse streaming content with immediate code block formatting
   const parseStreamingContent = (content: string) => {
     // Apply same normalization as regular parsing
     const normalizedContent = content
       .replace(/\u00A0/g, ' ')  // Remove non-breaking spaces
       .replace(/\r\n/g, '\n')   // Normalize newlines
       .replace(/\r/g, '\n');    // Handle old Mac newlines
-    
-    // Remove any image markdown (handled separately)
-    const cleanContent = normalizedContent.replace(/!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^)]+)\)/g, '').trim();
       
+    // Just parse for code blocks - images will be handled by renderMarkdownText
+    return parseStreamingContentForCode(normalizedContent);
+  };
+  
+  // Helper function to parse code blocks in streaming content
+  const parseStreamingContentForCode = (content: string) => {
     const parts = [];
     let currentIndex = 0;
     
-    // Process code blocks only since images are handled separately
-    const allMatches = [];
+    // Look for code block starts (```python, ```javascript, etc.)
+    const codeStartRegex = /```(\w+)?/g;
     let match;
     
-    // Look for code block starts using clean content
-    const codeStartRegex = /```(\w+)?/g;
-    codeStartRegex.lastIndex = 0;
-    
-    while ((match = codeStartRegex.exec(cleanContent)) !== null) {
-      allMatches.push({
-        type: 'code',
-        match: match,
-        index: match.index,
-        length: match[0].length,
-        codeStartRegex: true // Special marker for code processing
-      });
-    }
-    
-    // Sort all matches by index
-    allMatches.sort((a, b) => a.index - b.index);
-    
-    // Process all matches in order
-    for (const matchItem of allMatches) {
-      // Add text before this match
-      if (matchItem.index > currentIndex) {
+    while ((match = codeStartRegex.exec(content)) !== null) {
+      // Add text before code block
+      if (match.index > currentIndex) {
         parts.push({
           type: 'text',
-          content: cleanContent.slice(currentIndex, matchItem.index)
+          content: content.slice(currentIndex, match.index)
         });
       }
       
-      // Only handle code blocks since images are handled separately
-      if (matchItem.type === 'code') {
-        const match = matchItem.match;
-        
-        // Find the end of this code block or end of content
-        const codeStart = match.index;
-        const language = match[1] || 'text';
-        const codeContentStart = match.index + match[0].length;
+      // Find the end of this code block or end of content
+      const codeStart = match.index;
+      const language = match[1] || 'text';
+      const codeContentStart = match.index + match[0].length;
       
       // Look for closing ```
-      const remainingContent = cleanContent.slice(codeContentStart);
+      const remainingContent = content.slice(codeContentStart);
       const codeEndMatch = remainingContent.match(/^[\s\S]*?```/);
       
       if (codeEndMatch) {
@@ -594,15 +465,14 @@ const ChatPage: React.FC = () => {
             content: codeContent
           });
         }
-        currentIndex = cleanContent.length;
+        currentIndex = content.length;
         break;
       }
     }
-    }
     
     // Add remaining text
-    if (currentIndex < cleanContent.length) {
-      const remainingText = cleanContent.slice(currentIndex);
+    if (currentIndex < content.length) {
+      const remainingText = content.slice(currentIndex);
       // Check if the remaining text is just starting a code block
       if (remainingText.match(/^```\w*$/)) {
         parts.push({
@@ -617,7 +487,7 @@ const ChatPage: React.FC = () => {
       }
     }
     
-    return parts.length > 0 ? parts : [{ type: 'text', content: cleanContent }];
+    return parts;
   };
 
   // Render markdown text with proper formatting
@@ -647,6 +517,29 @@ const ChatPage: React.FC = () => {
       if (trimmedLine === '') {
         // Empty line - add spacing
         elements.push(<div key={currentIndex++} className="h-3"></div>);
+        continue;
+      }
+
+      // Check for images ![alt](data:image/...)
+      const imageMatch = trimmedLine.match(/^!\[([^\]]*)\]\(data:image\/[^;]+;base64,([^)]+)\)$/);
+      if (imageMatch) {
+        const altText = imageMatch[1] || 'Generated Image';
+        const base64Data = imageMatch[2];
+        
+        elements.push(
+          <div key={currentIndex++} className="my-6">
+            <img
+              src={`data:image/png;base64,${base64Data}`}
+              alt={altText}
+              className="w-full max-h-[600px] min-h-[400px] rounded-lg shadow-lg border border-gray-200"
+              style={{ objectFit: 'contain' }}
+              onError={(e) => {
+                console.error('Failed to load markdown image:', e);
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
+        );
         continue;
       }
 
@@ -939,94 +832,60 @@ const ChatPage: React.FC = () => {
           if (part.type === 'code' || part.type === 'streaming-code') {
             const codeId = `${messageId}-${index}`;
             const isStreamingCode = part.type === 'streaming-code';
-            const isCollapsed = collapsedCodeBlocks.has(codeId);
             const isPython = part.language && part.language.toLowerCase() === 'python';
+            
+            // Check if this code block has been toggled by user
+            const hasBeenToggled = collapsedCodeBlocks.has(codeId);
+            // For Python: default collapsed (true), for others: default expanded (false)
+            // But if user has toggled it, respect their choice by inverting the default
+            const isCollapsed = isPython 
+              ? (hasBeenToggled ? false : true)  // Python defaults to collapsed, toggle makes it expanded
+              : hasBeenToggled;                  // Others default to expanded, toggle makes them collapsed
             const isExpanded = expandedPythonBlocks.has(codeId);
             
-            // For Python code: check if content exceeds limit and handle truncation
-            const PYTHON_DISPLAY_LINES = 15; // Fixed number of lines to show
-            const lines = (part.content || '').split('\n');
-            const shouldLimitPython = isPython && lines.length > PYTHON_DISPLAY_LINES;
-            let displayContent = part.content || '';
-            
-            if (shouldLimitPython && !isExpanded) {
-              if (isStreamingCode && lines.length > PYTHON_DISPLAY_LINES) {
-                // During streaming: show fixed window with newest lines (sliding window)
-                const startIndex = Math.max(0, lines.length - PYTHON_DISPLAY_LINES);
-                const visibleLines = lines.slice(startIndex);
-                displayContent = (startIndex > 0 ? '...\n' : '') + visibleLines.join('\n');
-              } else if (!isStreamingCode && lines.length > PYTHON_DISPLAY_LINES) {
-                // Static code: show first lines with "..."
-                displayContent = lines.slice(0, PYTHON_DISPLAY_LINES).join('\n') + '\n...';
-              }
-            }
+            // Always show full content when expanded
+            const displayContent = part.content;
             
             return (
-              <div key={index} className="my-3 first:mt-0 last:mb-0">
-                <div className={`bg-gray-800 rounded-t-2xl px-4 py-2.5 flex items-center justify-between border border-gray-700 shadow-soft ${
+              <div key={index} className="my-2 first:mt-0 last:mb-0">
+                <div className={`bg-gray-50 hover:bg-gray-100 rounded-xl px-4 py-2.5 flex items-center justify-between border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${
                   isStreamingCode ? 'animate-pulse' : ''
-                } ${isCollapsed ? 'rounded-b-2xl border-b' : ''}`}>
+                } ${isCollapsed ? 'rounded-xl' : 'rounded-t-xl border-b-0'}`}
+                onClick={() => toggleCodeBlock(codeId)}>
                   <div className="flex items-center space-x-3">
-                    <button
-                      onClick={() => toggleCodeBlock(codeId)}
-                      className="flex items-center space-x-2 text-gray-300 hover:text-white transition-all duration-200 rounded-lg p-1 hover:bg-gray-700"
-                      title={isCollapsed ? "Expand code" : "Collapse code"}
-                    >
+                    <div className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 transition-all duration-200">
                       {isCollapsed ? (
                         <ChevronRight className="w-4 h-4" />
                       ) : (
                         <ChevronDown className="w-4 h-4" />
                       )}
-                    </button>
-                    <span className="text-gray-300 text-sm font-mono font-medium">
+                    </div>
+                    <span className="text-gray-600 text-sm font-medium">
                       {part.language}
                       {isStreamingCode && (
-                        <span className="ml-2 text-green-400 animate-pulse">● streaming</span>
+                        <span className="ml-2 text-green-500 animate-pulse">● executing</span>
                       )}
                       {isCollapsed && (
                         <span className="ml-2 text-gray-400 text-xs">
-                          ({(part.content || '').split('\n').length} lines)
+                          ({part.content.split('\n').length} lines)
                         </span>
-                      )}
-                      {isPython && shouldLimitPython && !isExpanded && (
-                        <span className="ml-2 text-blue-400 text-xs">limited</span>
                       )}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {isPython && shouldLimitPython && !isCollapsed && !isExpanded && (
-                      <button
-                        onClick={() => togglePythonExpansion(codeId)}
-                        className="flex items-center space-x-2 px-3 py-1.5 text-blue-300 hover:text-blue-200 hover:bg-gray-700 transition-all duration-200 rounded-xl text-sm font-medium"
-                        title="Show full code"
-                      >
-                        <ChevronDown className="w-4 h-4" />
-                        <span>Show More</span>
-                      </button>
-                    )}
-                    {isPython && shouldLimitPython && !isCollapsed && isExpanded && (
-                      <button
-                        onClick={() => togglePythonExpansion(codeId)}
-                        className="flex items-center space-x-2 px-3 py-1.5 text-blue-300 hover:text-blue-200 hover:bg-gray-700 transition-all duration-200 rounded-xl text-sm font-medium"
-                        title="Show less"
-                      >
-                        <ChevronDown className="w-4 h-4 rotate-180" />
-                        <span>Show Less</span>
-                      </button>
-                    )}
                     {!isStreamingCode && !isCollapsed && (
                       <button
-                        onClick={() => copyToClipboard(part.content || '', codeId)}
-                        className="flex items-center space-x-2 px-3 py-1.5 text-gray-300 hover:text-white hover:bg-gray-700 transition-all duration-200 rounded-xl text-sm font-medium shadow-soft hover:shadow-medium"
+                        onClick={(e) => { e.stopPropagation(); copyToClipboard(part.content, codeId); }}
+                        className="flex items-center space-x-1 px-2 py-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-all duration-200 rounded-lg text-xs font-medium"
                       >
                         {copiedCode === codeId ? (
                           <>
-                            <Check className="w-4 h-4" />
+                            <Check className="w-3 h-3" />
                             <span>Copied!</span>
                           </>
                         ) : (
                           <>
-                            <Copy className="w-4 h-4" />
+                            <Copy className="w-3 h-3" />
                             <span>Copy</span>
                           </>
                         )}
@@ -1035,11 +894,9 @@ const ChatPage: React.FC = () => {
                   </div>
                 </div>
                 {!isCollapsed && (
-                  <div className="bg-gray-900 border border-gray-700 border-t-0 shadow-soft transition-all duration-300 rounded-b-2xl">
-                    <div className={`p-4 overflow-x-auto relative ${
-                      isPython && shouldLimitPython && !isExpanded ? 'max-h-96 overflow-y-hidden' : ''
-                    }`}>
-                      <pre className="text-gray-100 text-sm leading-[1.6] font-mono whitespace-pre-wrap">
+                  <div className="bg-gray-50 border border-gray-200 border-t-0 shadow-sm transition-all duration-300 rounded-b-xl">
+                    <div className="p-4 overflow-x-auto">
+                      <pre className="text-gray-700 text-sm leading-[1.6] font-mono whitespace-pre-wrap">
                         <code>
                           {displayContent}
                         </code>
@@ -1049,20 +906,53 @@ const ChatPage: React.FC = () => {
                 )}
               </div>
             );
-          } else if (part.type === 'image') {
-            // Images are now handled separately via messageImages state
-            // This should not occur anymore, but keep for safety
-            return null;
           } else {
             return (
               <div key={index} className="whitespace-pre-wrap leading-relaxed text-gray-800">
-                {renderMarkdownText(part.content?.trim() || '')}
+                {renderMarkdownText(part.content.trim())}
               </div>
             );
           }
         })}
       </div>
     );
+  };
+
+  // Parse historical message content that may contain JSON data format
+  const parseHistoricalMessage = (content: string): string => {
+    if (!content) return content;
+    
+    let cleanedContent = '';
+    const lines = content.split('\n');
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      if (trimmedLine.startsWith('data: ')) {
+        try {
+          const jsonString = trimmedLine.substring(6).trim();
+          const jsonData = JSON.parse(jsonString);
+          
+          if (jsonData.type === 'text') {
+            cleanedContent += jsonData.data;
+          } else if (jsonData.type === 'image') {
+            // Convert image data back to markdown format
+            cleanedContent += `\n![Generated Image](data:image/png;base64,${jsonData.data})\n`;
+          }
+        } catch (error) {
+          // If JSON parsing fails, treat as plain text
+          cleanedContent += line + '\n';
+        }
+      } else if (trimmedLine) {
+        // Regular text line
+        cleanedContent += line + '\n';
+      } else {
+        // Empty line - preserve it
+        cleanedContent += '\n';
+      }
+    }
+    
+    return cleanedContent.replace(/\n$/, ''); // Remove trailing newline
   };
 
   // Load messages for a session
@@ -1075,15 +965,18 @@ const ChatPage: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setMessages(data);
+        // Parse historical messages to clean up JSON data format
+        const cleanedMessages = data.map((message: Message) => ({
+          ...message,
+          content: message.role === 'assistant' ? parseHistoricalMessage(message.content) : message.content
+        }));
+        setMessages(cleanedMessages);
       } else if (response.status === 404) {
         console.log(`Messages endpoint not found for session ${sessionId}, starting with empty messages`);
         setMessages([]);
-        setMessageImages({});
       } else {
         console.error(`Failed to load messages, status: ${response.status}`);
         setMessages([]);
-        setMessageImages({});
       }
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -1096,7 +989,6 @@ const ChatPage: React.FC = () => {
     try {
       // Clear existing messages immediately to show loading state
       setMessages([]);
-      setMessageImages({});
       
       // Get current values at time of call
       const sessionInfo = { sessionId: currentSession?.id, sessionTitle: currentSession?.title };
@@ -1135,42 +1027,9 @@ const ChatPage: React.FC = () => {
             timestamp: new Date(currentTime.getTime() + index * 2).toISOString(),
           });
           
-          // IDENTICAL PARSING TO LIVE STREAMING - Parse test images exactly the same way
-          let cleanedAnswer = item.answer;
-          const assistantMessageId = `${baseId + 1}`;
-          
-          // Look for image markdown: ![alt](data:image/...)
-          const imageRegex = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^)]+)\)/g;
-          let imageMatch;
-          
-          // Process each image IDENTICALLY to live streaming
-          while ((imageMatch = imageRegex.exec(item.answer)) !== null) {
-            const fullDataUrl = imageMatch[2]; // The complete data URL
-            
-            // Extract just the base64 part (after the comma)
-            const base64Part = fullDataUrl.split(',')[1];
-            
-            console.log('🧪 Testing image parsed IDENTICALLY to live stream:', {
-              fullUrl: fullDataUrl.substring(0, 50) + '...',
-              base64Length: base64Part?.length
-            });
-            
-            // Store image for history message
-            if (base64Part) {
-              const imageDataUrl = base64Part.startsWith('data:') ? base64Part : `data:image/png;base64,${base64Part}`;
-              setMessageImages(prev => ({
-                ...prev,
-                [assistantMessageId]: [...(prev[assistantMessageId] || []), imageDataUrl]
-              }));
-            }
-          }
-          
-          // Remove ALL image markdown from text content - images displayed separately
-          cleanedAnswer = cleanedAnswer.replace(imageRegex, '').trim();
-          
           messages.push({
-            id: assistantMessageId,
-            content: cleanedAnswer,
+            id: `${baseId + 1}`,
+            content: item.answer,
             role: 'assistant',
             timestamp: new Date(currentTime.getTime() + index * 2 + 1).toISOString(),
           });
@@ -1242,43 +1101,10 @@ const ChatPage: React.FC = () => {
               timestamp: new Date(currentTime.getTime() + index * 2).toISOString(),
             });
             
-            // IDENTICAL PARSING TO LIVE STREAMING - Parse images exactly the same way
-            let cleanedContent = cleanAnswer;
-            const assistantMessageId = `${baseId + 1}`;
-            
-            // Look for any stored image data in history content
-            const imageRegex = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^)]+)\)/g;
-            let imageMatch;
-            
-            // Process each image IDENTICALLY to live streaming
-            while ((imageMatch = imageRegex.exec(cleanAnswer)) !== null) {
-              const fullDataUrl = imageMatch[2]; // The complete data URL: "data:image/png;base64,ABC123..."
-              
-              // Extract just the base64 part (after the comma)
-              const base64Part = fullDataUrl.split(',')[1];
-              
-              console.log('🖼️ Processing history image IDENTICALLY to live stream:', {
-                fullUrl: fullDataUrl.substring(0, 50) + '...',
-                base64Length: base64Part?.length
-              });
-              
-              // Store image for history message
-              if (base64Part) {
-                const imageDataUrl = base64Part.startsWith('data:') ? base64Part : `data:image/png;base64,${base64Part}`;
-                setMessageImages(prev => ({
-                  ...prev,
-                  [assistantMessageId]: [...(prev[assistantMessageId] || []), imageDataUrl]
-                }));
-              }
-            }
-            
-            // Remove ALL image markdown from text content - images displayed separately
-            cleanedContent = cleanedContent.replace(imageRegex, '').trim();
-            
-            // Add assistant message with clean text (no images in content)
+            // Add assistant answer (will appear on LEFT side)
             messages.push({
-              id: assistantMessageId,
-              content: cleanedContent,
+              id: `${baseId + 1}`,
+              content: cleanAnswer,
               role: 'assistant',
               timestamp: new Date(currentTime.getTime() + index * 2 + 1).toISOString(),
             });
@@ -1293,14 +1119,12 @@ const ChatPage: React.FC = () => {
           console.log('📝 No previous conversation history found - showing empty chat (like new session)');
           console.log('📋 Response data was:', chatHistory);
           setMessages([]);
-        setMessageImages({});
         }
       } else {
         const errorText = await response.text().catch(() => 'No error details');
         console.log(`⚠️ Chat history service responded with status ${response.status}`);
         console.log(`📝 Error response body:`, errorText);
         setMessages([]);
-        setMessageImages({});
       }
     } catch (error) {
       console.error('❌ Error loading chat history:', error);
@@ -1556,7 +1380,6 @@ const ChatPage: React.FC = () => {
         setSessions(prev => [newSession, ...prev]);
         setCurrentSession(newSession);
         setMessages([]);
-        setMessageImages({});
         setShowNewSessionModal(false);
         setNewSessionName('');
         
@@ -1696,7 +1519,6 @@ const ChatPage: React.FC = () => {
           } else {
             setCurrentSession(null);
             setMessages([]);
-        setMessageImages({});
             setActiveFile(null);
           }
         }
@@ -1913,6 +1735,7 @@ const ChatPage: React.FC = () => {
         try {
           let currentMessageId = assistantMessageId;
           let currentContent = '';
+          let partialLine = ''; // Buffer for incomplete lines
           
           while (true) {
             const { done, value } = await reader.read();
@@ -1947,7 +1770,7 @@ const ChatPage: React.FC = () => {
               break;
             }
 
-            // Decode the chunk - parse JSON messages from the ML agent
+            // Decode the chunk - this could be structured data from the ML agent
             const chunk = decoder.decode(value, { stream: true });
             chunkCount++;
             const currentTime = Date.now();
@@ -1956,57 +1779,59 @@ const ChatPage: React.FC = () => {
               console.log(`📦 Chunk ${chunkCount}:`, JSON.stringify(chunk));
             }
             
-            // UNIFIED JSON PARSING - Backend sends ALL data as: data: {"type": "text/image", "data": "content"}
-            const lines = chunk.split('\n');
+            // Parse streaming data chunks that may contain structured data
+            // Handle partial lines from previous chunks
+            const chunkWithBuffer = partialLine + chunk;
+            const lines = chunkWithBuffer.split('\n');
+            
+            // Keep the last line as partial if it doesn't end with newline
+            partialLine = chunk.endsWith('\n') ? '' : lines.pop() || '';
             
             for (const line of lines) {
-              if (line.startsWith('data: {')) {
+              const trimmedLine = line.trim();
+              
+              if (trimmedLine.startsWith('data: ')) {
                 try {
-                  const jsonStr = line.substring(6); // Remove "data: " prefix
-                  const msg = JSON.parse(jsonStr);
-                  
-                  // Handle different message types - build inline content
-                  if (msg.type === "text") {
-                    if (msg.data) {
-                      currentContent += msg.data;
-                      // Update inline content - preserve full text formatting
-                      setMessageContent(prev => {
-                        const existing = prev[currentMessageId] || [];
-                        const lastItem = existing[existing.length - 1];
-                        if (lastItem && lastItem.type === 'text') {
-                          // Update the complete text content (not just append)
-                          lastItem.data = currentContent;
-                          return { ...prev, [currentMessageId]: [...existing] };
-                        } else {
-                          // Create new text block with current complete content
-                          return { ...prev, [currentMessageId]: [...existing, {type: 'text', data: currentContent}] };
-                        }
-                      });
-                    }
-                  } else if (msg.type === "image") {
-                    if (msg.data && currentMessageId) {
-                      console.log('🖼️ LIVE: Showing image RIGHT NOW!');
-                      // Show image ONLY while receiving it - pure live streaming
-                      const dataURL = `data:image/png;base64,${msg.data}`;
-                      setCurrentStreamingImage(dataURL);
-                    }
-                  } else if (msg.type === "end") {
-                    console.log('✅ Stream finished');
-                    // Clear any live image when streaming ends
-                    setCurrentStreamingImage(null);
-                    break;
+                  const jsonString = trimmedLine.substring(6).trim();
+                  if (DEBUG_STREAMING) {
+                    console.log(`🔍 Parsing JSON:`, jsonString);
                   }
-                } catch (parseError) {
-                  console.error('JSON parse error:', parseError);
+                  
+                  const jsonData = JSON.parse(jsonString);
+                  
+                  if (jsonData.type === 'text') {
+                    currentContent += jsonData.data;
+                    if (DEBUG_STREAMING) {
+                      console.log(`📝 Added text:`, jsonData.data.substring(0, 50));
+                    }
+                  } else if (jsonData.type === 'image') {
+                    // Add image as a special marker in the content
+                    currentContent += `\n![Generated Image](data:image/png;base64,${jsonData.data})\n`;
+                    if (DEBUG_STREAMING) {
+                      console.log(`🖼️ Added image, base64 length:`, jsonData.data.length);
+                    }
+                  }
+                } catch (error) {
+                  // If JSON parsing fails, treat as plain text
+                  if (DEBUG_STREAMING) {
+                    console.log(`⚠️ JSON parsing failed for line:`, trimmedLine);
+                    console.error('Parse error:', error);
+                  }
+                  // Don't add the malformed JSON to content - just skip it
+                }
+              } else if (trimmedLine && !trimmedLine.startsWith('data: ')) {
+                // Handle plain text chunks that don't follow the data: format
+                currentContent += trimmedLine + '\n';
+                if (DEBUG_STREAMING) {
+                  console.log(`📄 Added plain text:`, trimmedLine.substring(0, 50));
                 }
               }
             }
-            
-            // Update message with clean text content (remove image markdown since images are handled separately)
-            const cleanTextContent = currentContent.replace(/!\[([^\]]*)\]\((data:image\/[^;]+;base64,[^)]+)\)/g, '').trim();
+              
+            // Update the current assistant message in real-time
             setMessages(prev => prev.map(msg => 
               msg.id === currentMessageId 
-                ? { ...msg, content: cleanTextContent }
+                ? { ...msg, content: currentContent }
                 : msg
             ));
             
@@ -2461,26 +2286,7 @@ const ChatPage: React.FC = () => {
                           <div className="text-base leading-[1.7] text-gray-800 font-normal text-left">
                             {message.content ? (
                               <>
-                                {/* LIVE STREAMING: Text + Current Image Only */}
-                                <div className="space-y-2">
-                                  {/* TEXT CONTENT */}
-                                  <div className="prose max-w-none">
-                                    {renderMessageWithSeparators(message.content, message.id, isLoading && currentStreamingMessageId === message.id)}
-                                  </div>
-                                  
-                                  {/* LIVE STREAMING IMAGE - Shows only current image, then disappears */}
-                                  {currentStreamingImage && currentStreamingMessageId === message.id && (
-                                    <div className="my-4 animate-pulse">
-                                      <div className="text-sm text-blue-600 mb-2">📊 Live Analysis:</div>
-                                      <img 
-                                        src={currentStreamingImage} 
-                                        alt="Live Analysis Chart"
-                                        className="w-full h-auto rounded border-2 border-blue-300 shadow-lg"
-                                        style={{ maxWidth: '100%' }}
-                                      />
-                                    </div>
-                                  )}
-                                </div>
+                                {renderMessageWithSeparators(message.content, message.id, isLoading && currentStreamingMessageId === message.id)}
                               </>
                             ) : (
                               /* Loading state - single bold dot */

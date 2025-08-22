@@ -22,6 +22,7 @@ code_generation_prompt = ChatPromptTemplate.from_messages(
 - Analyze algorithms, modeling strategies, trade-offs, time/space complexity, and design patterns **for every operation**.  
 - Optimize all steps for efficiency, correctness, and scalability.  
 - Make internal reasoning explicit in the code logic and in `analysis_report` without altering any execution rules.  
+- Include visualization ONLY if instruction EXPLICILY tells to do thath, otherwive NO VISUALIZATION included.
 
 2. **Insight-Rich Reporting (Dynamic & Context-Aware)** — Every action must append to `analysis_report`:  
 - For **every single sub-task or operation implied by the instruction**, append a dict capturing **all meaningful and relevant information** derived from the context.  
