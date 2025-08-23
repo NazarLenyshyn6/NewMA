@@ -1,4 +1,15 @@
-"""..."""
+"""
+File service layer.
+
+This module defines the `FileService` class which encapsulates
+business logic for managing files, including uploading, deleting,
+retrieving all files for a user, and managing the active file per session.
+
+It integrates with:
+- `FileRepository` for database persistence.
+- `LocalStorage` (or other storage backends) for file storage.
+- `FileCacheManager` for caching active file metadata.
+"""
 
 from uuid import UUID
 from dataclasses import dataclass
@@ -8,7 +19,7 @@ from sqlalchemy.orm import Session
 from fastapi import UploadFile, HTTPException, status
 
 from core.enums import StorageType
-from core.file_cache import FileCacheManager, file_cache
+from cache.file import FileCacheManager, file_cache
 from schemas.file import FileRead, FileCreate
 from storage.local import LocalStorage
 from repositories.file import FileRepository
@@ -16,19 +27,47 @@ from repositories.file import FileRepository
 
 @dataclass
 class FileService:
-    """..."""
+    """
+    Service layer for file management.
+
+    Attributes:
+        file_cache: Instance of `FileCacheManager` to manage active
+                    file caching per session.
+    """
 
     file_cache: FileCacheManager
 
     def get_files(self, db: Session, user_id: int) -> List[FileRead]:
-        """..."""
+        """
+        Retrieve all files for a specific user.
+
+        Args:
+            db: SQLAlchemy session object.
+            user_id: ID of the user whose files to retrieve.
+
+        Returns:
+            List[FileRead]: List of file metadata for the user.
+        """
         db_files = FileRepository.get_files(db=db, user_id=user_id)
         return [FileRead.model_validate(file) for file in db_files]
 
     def get_active_file(
         self, db: Session, user_id: int, session_id: UUID
     ) -> Union[dict, FileRead]:
-        """..."""
+        """
+        Retrieve the currently active file for a given session.
+
+        Args:
+            db: SQLAlchemy session object.
+            user_id: ID of the user.
+            session_id: UUID of the session.
+
+        Raises:
+            HTTPException: If no active file is found for the session.
+
+        Returns:
+            Union[dict, FileRead]: Active file metadata from cache.
+        """
         cached_file = self.file_cache.get_active_file_data(
             user_id=user_id, session_id=session_id
         )
@@ -49,7 +88,30 @@ class FileService:
         session_id: UUID,
         file: UploadFile,
     ) -> FileRead:
-        """..."""
+        """
+        Upload a new file, persist metadata, and cache it as active.
+
+        Steps:
+            1. Upload file to storage backend and obtain URI.
+            2. Create a FileCreate schema with metadata.
+            3. Persist the file metadata to the database.
+            4. Cache the file as the active file for the session.
+
+        Args:
+            db: SQLAlchemy session object.
+            file_name: Name of the file (without extension).
+            description: Description of the file content.
+            storage_type: Type of storage backend.
+            user_id: ID of the user uploading the file.
+            session_id: UUID of the session.
+            file: File object uploaded via FastAPI.
+
+        Returns:
+            FileRead: Metadata of the uploaded file.
+
+        Raises:
+            HTTPException: If the file cannot be cached or saved.
+        """
         # Upload the file to storage and get its URI
         storage_uri, file_summary = LocalStorage.upload_file(
             file_name=file_name, user_id=user_id, file=file
@@ -80,7 +142,18 @@ class FileService:
     def set_active_file(
         self, db: Session, user_id: int, session_id: UUID, file_name: str
     ) -> None:
-        """..."""
+        """
+        Set a specific file as the active file for a session.
+
+        Args:
+            db: SQLAlchemy session object.
+            user_id: ID of the user.
+            session_id: UUID of the session.
+            file_name: Name of the file to set as active.
+
+        Raises:
+            HTTPException: If the file does not exist.
+        """
         # Fetch file metadata from database
         db_file = FileRepository.get_file(db=db, user_id=user_id, file_name=file_name)
         if db_file is None:
@@ -98,7 +171,22 @@ class FileService:
         )
 
     def delete_file(self, db: Session, user_id: int, file_name: str):
-        """..."""
+        """
+        Delete a file both from database and storage.
+
+        Steps:
+            1. Verify file exists in the database.
+            2. Delete metadata from the database.
+            3. Delete the physical file from storage backend.
+
+        Args:
+            db: SQLAlchemy session object.
+            user_id: ID of the user.
+            file_name: Name of the file to delete.
+
+        Raises:
+            HTTPException: If the file does not exist.
+        """
         # Check if the file exists before attempting deletion
         db_file = FileRepository.get_file(db=db, user_id=user_id, file_name=file_name)
         if db_file is None:
@@ -114,4 +202,5 @@ class FileService:
         LocalStorage.delete_file(storage_uri=db_file.storage_uri)
 
 
+# Instantiate a global file service with the configured file cache
 file_service = FileService(file_cache)
