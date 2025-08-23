@@ -1,4 +1,17 @@
-"""..."""
+"""
+Session service module.
+
+This module defines the `SessionService` class responsible for handling
+business logic related to user sessions. It integrates with the
+SessionRepository for database operations and SessionCacheManager for caching
+active session IDs. This service enforces rules such as unique session titles,
+single active session per user, and proper caching of active sessions.
+
+Components:
+    - SessionService: Provides methods for creating, retrieving, activating,
+      and deleting user sessions.
+    - session_service: Singleton instance of SessionService with Redis cache.
+"""
 
 from dataclasses import dataclass
 from typing import List
@@ -7,7 +20,7 @@ from typing import List
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
-from core.session_cache import SessionCacheManager, session_cache
+from cache.session import SessionCacheManager, session_cache
 from core.exceptions import (
     ActiveSessionNotFoundError,
     SessionNotFoundError,
@@ -20,12 +33,35 @@ from repositories.session import SessionRepository
 
 @dataclass
 class SessionService:
-    """..."""
+    """
+    Service class for user session business logic.
+
+    Attributes:
+        session_cache (SessionCacheManager): Cache manager for active session IDs.
+    """
 
     session_cache: SessionCacheManager
 
     def create_session(self, db: Session, session_data: SessionCreate) -> SessionRead:
-        """..."""
+        """
+        Create a new session for a user and activate it.
+
+        Steps:
+            1. Create session in DB (enforcing unique title).
+            2. Deactivate current active session in DB and cache.
+            3. Set the new session as active.
+            4. Cache the new active session ID.
+
+        Args:
+            db (Session): SQLAlchemy session object.
+            session_data (SessionCreate): Data for creating a session.
+
+        Raises:
+            HTTPException: If session title already exists (409 CONFLICT).
+
+        Returns:
+            SessionRead: Newly created and activated session.
+        """
 
         # Create new session
         try:
@@ -63,12 +99,35 @@ class SessionService:
         return session
 
     def get_sessions(self, db: Session, user_id: int) -> List[SessionRead]:
-        """..."""
+        """
+        Retrieve all sessions for a given user.
+
+        Args:
+            db: SQLAlchemy session object.
+            user_id: ID of the user.
+
+        Returns:
+            List[SessionRead]: List of session objects for the user.
+        """
         db_sessions = SessionRepository.get_sessions(db=db, user_id=user_id)
         return [SessionRead.model_validate(session) for session in db_sessions]
 
     def get_active_session_id(self, db: Session, user_id: int) -> str:
-        """..."""
+        """
+        Get the currently active session ID for a user.
+
+        Uses cache first, falls back to the database if not found.
+
+        Args:
+            db: SQLAlchemy session object.
+            user_id: ID of the user.
+
+        Raises:
+            HTTPException: If no active session exists (404 NOT FOUND).
+
+        Returns:
+            str: Active session ID.
+        """
         cached_active_session_id = self.session_cache.get_active_session_id(
             user_id=str(user_id)
         )
@@ -91,7 +150,23 @@ class SessionService:
         return session_id
 
     def set_active_session(self, db: Session, user_id: int, title: str) -> dict:
-        """..."""
+        """
+        Set a session as active for a user.
+
+        Deactivates the current active session (if any) and activates the new one.
+        Updates the cache accordingly.
+
+        Args:
+            db: SQLAlchemy session object.
+            user_id: ID of the user.
+            title: Title of the session to activate.
+
+        Raises:
+            HTTPException: If session is not found (404 NOT FOUND).
+
+        Returns:
+            dict: Confirmation message with session title and user_id.
+        """
 
         # Get session to activate
         db_session = SessionRepository.get_session_by_title(
@@ -120,7 +195,20 @@ class SessionService:
         return {"detail": f"'{title}' set as active session for user_id={user_id}"}
 
     def delete_session(self, db: Session, user_id: int, title: str) -> dict:
-        """..."""
+        """
+        Delete a session by title for a user.
+
+        Args:
+            db: SQLAlchemy session object.
+            user_id: ID of the user.
+            title: Title of the session to delete.
+
+        Raises:
+            HTTPException: If session not found (404) or active session deletion attempted (400).
+
+        Returns:
+            dict: Confirmation message.
+        """
         try:
             SessionRepository.delete_session(db=db, user_id=user_id, title=title)
             return {"detail": "Session deleted successfully"}
@@ -136,4 +224,5 @@ class SessionService:
             )
 
 
+# Singleton instance of SessionService
 session_service = SessionService(session_cache=session_cache)
