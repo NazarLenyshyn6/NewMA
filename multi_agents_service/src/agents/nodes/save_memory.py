@@ -27,6 +27,7 @@ class SaveMemoryNode:
             state.variables_memory,
         ]
 
+        # Update memory in each table
         for service, update_value in zip(services, update_values):
             if update_value is None:
                 continue
@@ -39,7 +40,7 @@ class SaveMemoryNode:
                 update_value=pickle.dumps(update_value),
             )
 
-        # Get prevous conversation memory and exted it with current conversation memory
+        # Get prevous conversation memory a
         conversation_memory = pickle.loads(
             conversation_memory_service.get_memory(
                 db=state.db,
@@ -50,6 +51,7 @@ class SaveMemoryNode:
             ).memory
         )
 
+        # exted it with current conversation memory
         conversation_memory_service.update_memory_cache(
             db=state.db,
             user_id=state.user_id,

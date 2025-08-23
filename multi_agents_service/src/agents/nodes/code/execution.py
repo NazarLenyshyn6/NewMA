@@ -49,6 +49,8 @@ class CodeExecutionNode:
     def execute(cls, state: AgentState) -> AgentState:
         """..."""
         print("* CodeExecutionNode ->")
+
+        # Set up enviroment for code execution
         code = cls._extract_code(state.code)
         global_context = cls._import_dependencies(state.dependencies)
         local_context = state.variables_memory.copy()
@@ -66,7 +68,7 @@ class CodeExecutionNode:
             state.variables_memory = persisted_variables
             state.code_summary_memory = SummarizationNode.code_summarization(
                 code=state.code,
-                code_memory=state.code_summary_memory,
+                code_summary_memory=state.code_summary_memory,
                 variables_memory=state.variables_memory,
             )
 

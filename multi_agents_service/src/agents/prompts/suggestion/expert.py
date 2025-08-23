@@ -58,7 +58,7 @@ __
 {question}
 
 Chat History Summary:
-{history}
+{conversation_summary_memory}
 
 Respond strictly as defined above."""
         ),

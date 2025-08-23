@@ -48,7 +48,7 @@ conversation_summarization_prompt = ChatPromptTemplate.from_messages(
             "### New Input to Summarize ###\n"
             "{conversation}\n\n"
             "### Previous Summary ###\n"
-            "{history}\n\n"
+            "{conversation_summary_memory}\n\n"
             "### Task ###\n"
             "Incrementally update the summary following the strict rules above:\n"
             "- If empty, initialize with the unified structure.\n"

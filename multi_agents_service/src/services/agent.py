@@ -1,17 +1,20 @@
 """..."""
 
+from typing import Any
 from uuid import UUID
 import json
 
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from agents.graphs.builder import expert_agent
 
 
-class AgentService:
+class AgentService(BaseModel):
+    agent: Any
 
-    @staticmethod
-    async def expert_agent_stream(
+    async def stream(
+        self,
         question: str,
         db: Session,
         user_id: int,
@@ -21,7 +24,7 @@ class AgentService:
         dataset_summary: str,
     ):
         """..."""
-        async for chunk in expert_agent.astream_events(
+        async for chunk in self.agent.astream_events(
             {
                 "question": question,
                 "db": db,
@@ -47,3 +50,6 @@ class AgentService:
                 if stream:
                     data = chunk["data"]["chunk"].content
                     yield f"data: {json.dumps({'type': 'text', 'data': data})}\n\n"
+
+
+expert_agent_service = AgentService(agent=expert_agent)

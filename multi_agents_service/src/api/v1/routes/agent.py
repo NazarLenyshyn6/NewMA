@@ -8,7 +8,7 @@ from core.db import db_manager
 from schemas.agent import ChatRequest
 
 
-from services.agent import AgentService
+from services.agent import expert_agent_service
 
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -19,7 +19,7 @@ async def chat_stream(
     chat_request: ChatRequest,
     db: Session = Depends(db_manager.get_db),
 ):
-    stream = AgentService.expert_agent_stream(
+    stream = expert_agent_service.stream(
         question=chat_request.question,
         db=db,
         user_id=chat_request.user_id,
@@ -36,7 +36,7 @@ async def chat_stream(
     chat_request: ChatRequest,
     db: Session = Depends(db_manager.get_db),
 ):
-    stream = AgentService.expert_agent_stream(
+    stream = expert_agent_service.stream(
         question=chat_request.question,
         db=db,
         user_id=chat_request.user_id,
@@ -53,7 +53,7 @@ async def chat_stream(
     chat_request: ChatRequest,
     db: Session = Depends(db_manager.get_db),
 ):
-    stream = AgentService.expert_agent_stream(
+    stream = expert_agent_service.stream(
         question=chat_request.question,
         db=db,
         user_id=chat_request.user_id,

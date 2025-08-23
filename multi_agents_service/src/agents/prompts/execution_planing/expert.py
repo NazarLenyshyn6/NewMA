@@ -1,3 +1,5 @@
+"""..."""
+
 from langchain.prompts import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
@@ -79,7 +81,7 @@ __
         HumanMessagePromptTemplate.from_template(
             "User question:\n{question}\n\n"
             "# Internal conversation history (do not mention or refer to this in your answer):\n"
-            "{history}"
+            "{conversation_summary_memory}"
         ),
     ]
 )

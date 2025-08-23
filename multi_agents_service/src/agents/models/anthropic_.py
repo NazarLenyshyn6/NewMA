@@ -64,14 +64,6 @@ code_generation_model = ChatAnthropic(
     streaming=True,
 )
 
-lambda_model = ChatAnthropic(
-    model_name="claude-sonnet-4-20250514",
-    anthropic_api_key=settings.anthropic_model.ANTHROPIC_API_KEY,
-    temperature=0.0,  # Tested 0.2
-    max_tokens=40000,
-    top_k=None,
-    top_p=1,
-)
 
 summarization_model = ChatAnthropic(
     model_name="claude-sonnet-4-20250514",

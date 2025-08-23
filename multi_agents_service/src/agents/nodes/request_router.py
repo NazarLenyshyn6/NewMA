@@ -14,6 +14,8 @@ class RequestRouterNode(BaseNode):
     def route(self, state: AgentState) -> AgentState:
         """..."""
         print("* RequestRouterNode -> ")
+
+        # Retviever conversation summary memoryt and store in graph state, to avoid unvessesary retriving from cache
         state.conversation_summary_memory = pickle.loads(
             conversation_summary_memory_service.get_memory(
                 db=state.db,
@@ -24,14 +26,15 @@ class RequestRouterNode(BaseNode):
             ).memory
         )
         state.request_type = self._chain.invoke(
-            {"question": state.question, "history": state.conversation_summary_memory},
+            {
+                "question": state.question,
+                "conversation_summary_memory": state.conversation_summary_memory,
+            },
             config={"metadata": {"stream": False}},
         ).content
 
         # Add question to conversation memory
         state.conversation_memory[0]["question"] = state.question
-
-        print("Memory:", state.conversation_summary_memory)
 
         return state
 

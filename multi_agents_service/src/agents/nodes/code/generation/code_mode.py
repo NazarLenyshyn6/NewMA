@@ -17,6 +17,7 @@ class CodeGenNode(BaseNode):
     def generate(self, state: AgentState) -> AgentState:
         """..."""
         print("* CodeGenNode -> ")
+        # Retvier all requied information from memory and store in graph
         if state.code_summary_memory is None:
             state.code_summary_memory = pickle.loads(
                 code_summary_memory_service.get_memory(

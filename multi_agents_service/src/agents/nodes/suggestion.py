@@ -13,7 +13,10 @@ class SuggestionNode(BaseNode):
         """..."""
         print("* SuggestionNode -> ")
         state.suggestion = self._chain.invoke(
-            {"question": state.question, "history": state.conversation_summary_memory}
+            {
+                "question": state.question,
+                "conversation_summary_memory": state.conversation_summary_memory,
+            }
         ).content
 
         state.conversation_summary_memory = (

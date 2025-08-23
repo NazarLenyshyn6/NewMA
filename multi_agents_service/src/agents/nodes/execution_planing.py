@@ -13,7 +13,7 @@ class ExecutionPlaningNode(BaseNode):
         state.execution_plan = self._chain.invoke(
             {
                 "question": state.subtasks[0],
-                "history": state.conversation_summary_memory,
+                "conversation_summary_memory": state.conversation_summary_memory,
             }
         ).content
 
@@ -22,7 +22,7 @@ class ExecutionPlaningNode(BaseNode):
             state.conversation_memory[0]["answer"] + state.execution_plan
         )
 
-        # Null prevous image
+        # Null prevous image to avoid showint the same image twice
         state.image = None
         return state
 

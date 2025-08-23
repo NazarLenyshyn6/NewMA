@@ -12,7 +12,10 @@ class SolutionPlaningNode(BaseNode):
     def plan(self, state: AgentState) -> AgentState:
         print("* SolutionPlaningNode -> ")
         state.subtasks = self._chain.invoke(
-            {"question": state.question, "history": state.conversation_summary_memory},
+            {
+                "question": state.question,
+                "conversation_summary_memory": state.conversation_summary_memory,
+            },
             config={"metadata": {"stream": False}},
         ).subtasks
         return state

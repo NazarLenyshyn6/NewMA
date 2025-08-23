@@ -33,7 +33,7 @@ request_routing_prompt = ChatPromptTemplate.from_messages(
         ),
         HumanMessagePromptTemplate.from_template(
             "User Message:\n{question}\n\n"
-            "History:\n{history}\n\n"
+            "History:\n{conversation_summary_memory}\n\n"
             "Classify the user's intent as either SUGGESTION or ACTION."
         ),
     ]

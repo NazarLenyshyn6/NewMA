@@ -7,7 +7,7 @@ from langchain.schema.runnable import RunnableLambda
 
 from agents.nodes.base import BaseNode
 from agents.prompts.reporting.expert import expert_reporting_prompt
-from agents.models.anthropic_ import expert_reporting_model, lambda_model
+from agents.models.anthropic_ import expert_reporting_model
 from agents.state import AgentState
 from agents.nodes.summarization import SummarizationNode
 
@@ -33,6 +33,7 @@ class ReportingNode(BaseNode):
 
     def report(self, state: AgentState) -> AgentState:
         print("* ReportingNodes -> ")
+        # Reporting when agent generate code without visualization
         if state.code_mode == "CODE":
             analysis_report = self._parse_analysis_report(state.analysis_report)
             report = self._chain.invoke(
@@ -56,8 +57,9 @@ class ReportingNode(BaseNode):
                 state.conversation_memory[0]["answer"] + report
             )
 
+        # Reportint whene agent generate code only for visualization
         else:
-            # Placehodler llm call go yield endoded image to frontend with requied metadata
+            # Custom runnable to provide image for yielding
             image_streaming_model = RunnableLambda(
                 lambda _: AIMessage(
                     content=state.image, additional_kwargs={}, response_metadata={}
@@ -65,7 +67,7 @@ class ReportingNode(BaseNode):
             )
             image_streaming_model.invoke("...", config={"metadata": {"image": True}})
 
-        # Remove subtask
+        # Remove subtask because it done
         state.subtasks.popleft()
         return state
 

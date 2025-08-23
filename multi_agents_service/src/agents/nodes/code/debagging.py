@@ -23,7 +23,6 @@ class CodeDebaggingNode(BaseNode):
                 "error_message": state.code_error,
                 "question": state.question,
             },
-            config={"metadata": {"checkpoint": "Debagging..."}},
         ).content
         state.current_code_debagging_attempt = state.current_code_debagging_attempt + 1
 

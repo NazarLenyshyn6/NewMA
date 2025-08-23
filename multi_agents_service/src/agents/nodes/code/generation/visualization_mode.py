@@ -17,6 +17,8 @@ class VisualizationGenNode(BaseNode):
     def generate(self, state: AgentState) -> AgentState:
         """..."""
         print("* VisualizationGenNode -> ")
+
+        # Retvier all requied information from memory and store in graph
         if state.code_summary_memory is None:
             state.code_summary_memory = pickle.loads(
                 code_summary_memory_service.get_memory(
@@ -44,7 +46,6 @@ class VisualizationGenNode(BaseNode):
                 "variables_memory": state.variables_memory.keys(),
                 "execution_plan": state.execution_plan,
             },
-            config={"metadata": {"checkpoint": "Generating visualization ..."}},
         ).content
 
         # Add generated code to conversation memory

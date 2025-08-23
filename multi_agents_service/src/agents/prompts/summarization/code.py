@@ -43,7 +43,7 @@ code_summarization_prompt = ChatPromptTemplate.from_messages(
             "### New Code to Analyze ###\n"
             "{code}\n\n"
             "### Previous Summary ###\n"
-            "{history}\n\n"
+            "{code_summary_memory}\n\n"
             "### Variables Persisting After Execution ###\n"
             "{variables_memory}\n\n"
             "✅ Task: Incrementally update the sectioned summary including only important persisted variables as described above. Never remove existing entries unless they are no longer listed in `Variables Persisting After Execution`."
