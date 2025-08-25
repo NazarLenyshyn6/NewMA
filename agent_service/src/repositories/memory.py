@@ -1,23 +1,55 @@
-"""..."""
+"""
+Database repository for memory persistence.
+
+This module defines the `MemoryRepository` class, which provides CRUD
+(Create, Read, Update, Delete) operations for agent memory records stored
+in the database. It acts as an abstraction over SQLAlchemy queries and
+encapsulates all low-level persistence logic.
+
+Classes:
+    MemoryRepository: Repository for creating, retrieving, updating,
+        and deleting agent memory records.
+"""
 
 from uuid import UUID
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from schemas.memory import AgentMemory as AgentMemorySchema
-from models.memory import AgentMemory as AgentMemoryModel
+from schemas.memory import Memory as MemorySchema
+from models.memory import Memory as MemoryModel
 
 
-class AgentMemoryRepository:
-    """..."""
+class MemoryRepository:
+    """
+    Repository for managing memory records.
+
+    Provides class methods to create, retrieve, update, and delete memory
+    records in the database. Each method accepts a SQLAlchemy session and
+    interacts with the `MemoryModel` ORM class. Designed for use within
+    higher-level services and application workflows.
+
+    Methods:
+        create_memory: Create and persist a new memory record.
+        get_memory: Retrieve a memory record by identifiers.
+        update_memory: Update fields of an existing memory record.
+        delete_memory: Remove a memory record by user and file name.
+    """
 
     @classmethod
-    def create_memory(
-        cls, db: Session, memory_schema: AgentMemorySchema
-    ) -> AgentMemoryModel:
-        """..."""
-        db_memory = AgentMemoryModel(**memory_schema.model_dump())
+    def create_memory(cls, db: Session, memory_schema: MemorySchema) -> MemoryModel:
+        """
+        Create and persist a new memory record.
+
+        Args:
+            db: SQLAlchemy database session.
+            memory_schema: Pydantic schema containing
+                memory details to be stored.
+
+        Returns:
+            MemoryModel: The newly created memory record.
+        """
+        db_memory = MemoryModel(**memory_schema.model_dump())
         db.add(db_memory)
         db.commit()
         db.refresh(db_memory)
@@ -26,10 +58,21 @@ class AgentMemoryRepository:
     @classmethod
     def get_memory(
         cls, db: Session, user_id: int, session_id: UUID, file_name: str
-    ) -> Optional[AgentMemoryModel]:
-        """..."""
+    ) -> Optional[MemoryModel]:
+        """
+        Retrieve a memory record by identifiers.
+
+        Args:
+            db: SQLAlchemy database session.
+            user_id: Identifier of the user.
+            session_id: Unique identifier of the session.
+            file_name: Name of the file associated with the memory.
+
+        Returns:
+            Optional[MemoryModel]: The memory record if found, otherwise None.
+        """
         return (
-            db.query(AgentMemoryModel)
+            db.query(MemoryModel)
             .filter_by(user_id=user_id, session_id=session_id, file_name=file_name)
             .first()
         )
@@ -41,36 +84,62 @@ class AgentMemoryRepository:
         user_id: int,
         session_id: UUID,
         file_name: str,
-        memory_schema: AgentMemorySchema,
+        memory_schema: MemorySchema,
     ) -> None:
-        """..."""
+        """
+        Update an existing memory record.
+
+        Args:
+            db: SQLAlchemy database session.
+            user_id: Identifier of the user.
+            session_id: Unique identifier of the session.
+            file_name: Name of the file associated with the memory.
+            memory_schema: Schema containing updated values.
+
+        Notes:
+            Only non-null fields in `memory_schema` overwrite existing values.
+        """
         memory_history = cls.get_memory(
             db=db, user_id=user_id, session_id=session_id, file_name=file_name
         )
 
-        if memory_schema.conversation_history is not None:
-            print("Conversation history")
-            memory_history.conversation_history = memory_schema.conversation_history
+        if memory_schema.analysis_summary is not None:
+            memory_history.analysis_summary = memory_schema.analysis_summary
 
-        if memory_schema.conversation_context is not None:
-            print("Conversation context")
-            memory_history.conversation_context = memory_schema.conversation_context
+        if memory_schema.visualization_summary is not None:
+            memory_history.visualization_summary = memory_schema.visualization_summary
 
-        if memory_schema.code_context is not None:
-            print("Code context")
-            memory_history.code_context = memory_schema.code_context
+        if memory_schema.code_summary is not None:
+            memory_history.code_summary = memory_schema.code_summary
 
-        if memory_schema.conversation_context is not None:
-            print("Variables")
-            memory_history.persisted_variables = memory_schema.persisted_variables
+        if memory_schema.user_preferences_summary is not None:
+            memory_history.user_preferences_summary = (
+                memory_schema.user_preferences_summary
+            )
+
+        if memory_schema.variables is not None:
+            memory_history.variables = memory_schema.variables
+
+        if memory_schema.conversation is not None:
+            memory_history.conversation = memory_schema.conversation
 
         db.commit()
 
     @classmethod
     def delete_memory(cls, db: Session, user_id: int, file_name: str) -> None:
-        """..."""
-        db.query(AgentMemoryModel).filter(
-            AgentMemoryModel.user_id == user_id, AgentMemoryModel.file_name == file_name
+        """
+        Delete a memory record.
+
+        Args:
+            db: SQLAlchemy database session.
+            user_id: Identifier of the user.
+            file_name: Name of the file associated with the memory.
+
+        Returns:
+            None
+        """
+        db.query(MemoryModel).filter(
+            MemoryModel.user_id == user_id, MemoryModel.file_name == file_name
         ).delete(synchronize_session=False)
 
         db.commit()

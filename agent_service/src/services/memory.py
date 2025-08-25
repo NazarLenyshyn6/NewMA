@@ -1,23 +1,61 @@
-"""..."""
+"""
+Service layer for agent memory management.
 
-from typing import Optional
+This module defines the `MemoryService` class, which provides high-level
+operations for retrieving, creating, updating, caching, and deleting
+agent memory. It integrates cache, database, and loader access into a
+unified interface for efficient memory management.
+
+Classes:
+    MemoryService: Provides service-level memory operations backed by
+        caching, persistence, and data loaders.
+
+Instances:
+    memory_service: Default instance of `MemoryService` configured with
+        the global `memory_cache_manager` and `LocalLoader`.
+"""
+
+from typing import Optional, Type
 from uuid import UUID
 from dataclasses import dataclass
 import pickle
 
 from sqlalchemy.orm import Session
 
+from loaders.base import BaseLoader
 from loaders.local import LocalLoader
-from repositories.memory import AgentMemoryRepository
-from cache.memory import AgentMemoryCacheManager, agent_memory_cache_manager
-from schemas.memory import AgentMemory
+from repositories.memory import MemoryRepository
+from cache.memory import MemoryCacheManager, memory_cache_manager
+from schemas.memory import Memory
 
 
 @dataclass
-class AgentMemoryService:
-    """..."""
+class MemoryService:
+    """
+    Service layer for managing agent memory.
 
-    agent_memory_cache_manager: AgentMemoryCacheManager
+    This class provides high-level APIs for working with memory records.
+    It combines in-memory caching, database persistence, and data loaders
+    into a single abstraction. Clients should use this service instead of
+    directly calling repositories or cache managers.
+
+    Attributes:
+        _memory_cache_manager (MemoryCacheManager): Cache manager used
+            to speed up memory retrieval and updates.
+        loader (Type[BaseLoader]): Loader class used to fetch base data
+            from local or remote storage.
+
+    Methods:
+        get_memory: Retrieve memory from cache, DB, or create if missing.
+        get_conversation_memory: Return the unpickled conversation history.
+        create_memory: Initialize and persist a new memory record.
+        update_memory_cache: Update memory fields in cache.
+        save_memory: Persist cached memory back into the database.
+        delete_memory: Remove a memory record from persistence.
+    """
+
+    _memory_cache_manager: MemoryCacheManager
+    loader: Type[BaseLoader]
 
     def get_memory(
         self,
@@ -26,29 +64,45 @@ class AgentMemoryService:
         session_id: UUID,
         file_name: str,
         storage_uri: str,
-    ) -> AgentMemory:
-        """..."""
-        # Attempt to retrieve chat history from cache for faster access
-        cached_memory = self.agent_memory_cache_manager.get_memory(
+    ) -> Memory:
+        """
+        Retrieve memory for a given user, session, and file.
+
+        The service first attempts to fetch memory from cache. If absent,
+        it falls back to the database. If no record exists, it creates a
+        new memory record initialized with base data from the loader.
+
+        Args:
+            db: SQLAlchemy session.
+            user_id: Identifier of the user.
+            session_id: Unique identifier of the session.
+            file_name: Associated file name.
+            storage_uri: Path or URI to storage for initial data.
+
+        Returns:
+            Memory: The retrieved or newly created memory instance.
+        """
+        # Try retrieving memory from cache first for faster access
+        cached_memory = self._memory_cache_manager.get_memory(
             session_id=session_id, file_name=file_name
         )
         if cached_memory is not None:
             return cached_memory
 
-        # Cache miss: fetch chat history from the database
-        db_memory = AgentMemoryRepository.get_memory(
+        # If cache miss, fetch memory from the database
+        db_memory = MemoryRepository.get_memory(
             db=db, user_id=user_id, session_id=session_id, file_name=file_name
         )
         if db_memory is not None:
-            memory_schema = AgentMemory.model_validate(db_memory)
+            memory_schema = Memory.model_validate(db_memory)
 
-            # Cache the retrieved chat history for future quick access
-            self.agent_memory_cache_manager.cache_memory(
+            # Cache the retrieved memory for future quick access
+            self._memory_cache_manager.cache_memory(
                 session_id=session_id, file_name=file_name, memory_schema=memory_schema
             )
             return memory_schema
 
-        # Chat history not found in cache or DB: create a new chat history instance
+        # If not found in cache or DB, create a new memory record
         return self.create_memory(
             db=db,
             user_id=user_id,
@@ -65,7 +119,22 @@ class AgentMemoryService:
         file_name: str,
         storage_uri: str,
     ):
-        """..."""
+        """
+        Retrieve conversation history from memory.
+
+        This method fetches the memory (via `get_memory`) and returns
+        the unpickled conversation list.
+
+        Args:
+            db: SQLAlchemy session.
+            user_id: Identifier of the user.
+            session_id: Unique identifier of the session.
+            file_name: Associated file name.
+            storage_uri: Path or URI to storage for initial data.
+
+        Returns:
+            Any: Unpickled conversation object (list or other structure).
+        """
         memory = self.get_memory(
             db=db,
             user_id=user_id,
@@ -73,7 +142,7 @@ class AgentMemoryService:
             file_name=file_name,
             storage_uri=storage_uri,
         )
-        return pickle.loads(memory.conversation_history)
+        return pickle.loads(memory.conversation)
 
     def create_memory(
         self,
@@ -82,29 +151,46 @@ class AgentMemoryService:
         session_id: UUID,
         file_name: str,
         storage_uri: str,
-    ) -> AgentMemory:
-        """..."""
-        # Load base data from the specified local storage pat (Will be replaced with cloud storage)
-        df = LocalLoader.load(storage_uri=storage_uri)
+    ) -> Memory:
+        """
+        Create and persist a new memory record.
 
-        # Create AgentMemory entity with initial empty pickled data for solutions and code,
-        # and store the loaded DataFrame in variables after pickling
+        Loads base data using the loader, initializes empty pickled
+        contexts for summaries, code, user preferences, variables, and
+        conversation, and persists the memory record into the database
+        and cache.
 
-        memory_schema = AgentMemory(
+        Args:
+            db: SQLAlchemy session.
+            user_id: Identifier of the user.
+            session_id: Unique identifier of the session.
+            file_name: Associated file name.
+            storage_uri: Path or URI to storage.
+
+        Returns:
+            Memory: The newly created memory instance.
+        """
+        # Load the initial data from the loader (local or remote)
+        df = self.loader.load(storage_uri=storage_uri)
+
+        # Initialize a Memory schema with empty summaries and pickled variables
+        memory_schema = Memory(
             user_id=user_id,
             session_id=session_id,
             file_name=file_name,
-            conversation_context=pickle.dumps(""),
-            conversation_history=pickle.dumps([]),
-            code_context=pickle.dumps(""),
-            persisted_variables=pickle.dumps({"df": df}),
+            analysis_summary=pickle.dumps(""),
+            visualization_summary=pickle.dumps(""),
+            code_summary=pickle.dumps(""),
+            user_preferences_summary=pickle.dumps(""),
+            variables=pickle.dumps({"df": df}),
+            conversation=pickle.dumps([]),
         )
 
-        # Persist the new chat history record into the database
-        AgentMemoryRepository.create_memory(db=db, memory_schema=memory_schema)
+        # Persist the memory record in the database
+        MemoryRepository.create_memory(db=db, memory_schema=memory_schema)
 
-        # Cache the newly created chat history to speed up future accesses
-        self.agent_memory_cache_manager.cache_memory(
+        # Cache the memory record for fast future access
+        self._memory_cache_manager.cache_memory(
             session_id=session_id, file_name=file_name, memory_schema=memory_schema
         )
 
@@ -117,14 +203,34 @@ class AgentMemoryService:
         session_id: UUID,
         file_name: str,
         storage_uri: str,
-        conversation_context: Optional[bytes] = None,
-        conversation_history: Optional[bytes] = None,
-        persisted_variables: Optional[bytes] = None,
-        code_context: Optional[bytes] = None,
+        analysis_summary: Optional[bytes] = None,
+        visualization_summary: Optional[bytes] = None,
+        code_summary: Optional[bytes] = None,
+        user_preferences_summary: Optional[bytes] = None,
+        variables: Optional[bytes] = None,
+        conversation: Optional[bytes] = None,
     ):
-        """..."""
+        """
+        Update cached memory fields.
 
-        # Get current chat history
+        Retrieves the latest memory (creating it if necessary),
+        applies updates to specified fields, and refreshes the cache.
+
+        Args:
+            db: SQLAlchemy session.
+            user_id: Identifier of the user.
+            session_id: Unique identifier of the session.
+            file_name: Associated file name.
+            storage_uri: Path or URI to storage.
+            analysis_summary: New analysis summary.
+            visualization_summary: New visualization summary.
+            code_summary: New code summary.
+            user_preference_summary: New user preference summary.
+            variables: Updated variable snapshot.
+            conversation: Updated conversation history.
+        """
+
+        # Get current memory (create if missing)
         memory_history = self.get_memory(
             db=db,
             user_id=user_id,
@@ -133,36 +239,52 @@ class AgentMemoryService:
             storage_uri=storage_uri,
         )
 
-        # Update chat history
-        if conversation_context is not None:
-            memory_history.conversation_context = conversation_context
+        # Update memory fields if provided
+        if analysis_summary is not None:
+            memory_history.analysis_summary = analysis_summary
 
-        if conversation_history is not None:
-            memory_history.conversation_history = conversation_history
+        if visualization_summary is not None:
+            memory_history.visualization_summary = visualization_summary
 
-        if code_context is not None:
-            memory_history.code_context = code_context
+        if code_summary is not None:
+            memory_history.code_summary = code_summary
 
-        if persisted_variables is not None:
-            memory_history.persisted_variables = persisted_variables
+        if user_preferences_summary is not None:
+            memory_history.user_preferences_summary = user_preferences_summary
 
-        # Cache updated chat history
-        self.agent_memory_cache_manager.cache_memory(
+        if variables is not None:
+            memory_history.variables = variables
+
+        if conversation is not None:
+            memory_history.conversation = conversation
+
+        # Refresh cache with updated memory
+        self._memory_cache_manager.cache_memory(
             session_id=session_id, file_name=file_name, memory_schema=memory_history
         )
 
     def save_memory(
         self, db: Session, user_id: int, session_id: UUID, file_name: str
     ) -> None:
-        """..."""
+        """
+        Persist cached memory into the database.
 
-        # Get chat history from cache
-        cached_memory: AgentMemory = self.agent_memory_cache_manager.get_memory(
+        Retrieves the memory from cache and updates the database record
+        if present.
+
+        Args:
+            db: SQLAlchemy session.
+            user_id: Identifier of the user.
+            session_id: Unique identifier of the session.
+            file_name: Associated file name.
+        """
+
+        cached_memory: Memory = self._memory_cache_manager.get_memory(
             session_id=session_id, file_name=file_name
         )
 
         if cached_memory is not None:
-            AgentMemoryRepository.update_memory(
+            MemoryRepository.update_memory(
                 db=db,
                 user_id=user_id,
                 session_id=session_id,
@@ -171,10 +293,16 @@ class AgentMemoryService:
             )
 
     def delete_memory(self, db: Session, user_id: int, file_name: str) -> None:
-        """..."""
-        AgentMemoryRepository.delete_memory(db=db, user_id=user_id, file_name=file_name)
+        """
+        Delete a memory record.
 
-        # Delete from cache (TODO)
+        Args:
+            db: SQLAlchemy session.
+            user_id: Identifier of the user.
+            file_name: Associated file name.
+        """
+        MemoryRepository.delete_memory(db=db, user_id=user_id, file_name=file_name)
 
 
-agent_memory_service = AgentMemoryService(agent_memory_cache_manager)
+# Default instance of the MemoryService for application usage
+memory_service = MemoryService(memory_cache_manager, loader=LocalLoader)
