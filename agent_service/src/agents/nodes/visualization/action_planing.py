@@ -46,6 +46,7 @@ class VisualizationActionPlaningNode(BaseNode):
             attribute populated based on the generated visualization plan.
         """
         print("* VisualizationActionPlaningNode -> ")
+        print("VISUALIZATION SUMMARY:", state.visualization_summary, "\n\n")
 
         # Use the first subtask and prior visualization summary to guide planning
         state.visualization_action_plan = self._chain.invoke(

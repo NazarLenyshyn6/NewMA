@@ -25,7 +25,6 @@ from sqlalchemy.orm import Session
 
 
 from agents.graphs.orchestrator import agents_orchestrator
-from agents.graphs.builder import AgentGraphRegistry
 
 
 class AgentService(BaseModel):
@@ -82,6 +81,7 @@ class AgentService(BaseModel):
                 "storage_uri": storage_uri,
                 "dataset_summary": dataset_summary,
             },
+            config={"recursion_limit": 100},
         ):
             # Handle image outputs when the chain ends and output exists
             if (

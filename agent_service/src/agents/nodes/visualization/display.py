@@ -12,6 +12,8 @@ from langchain.schema import AIMessage
 from langchain.schema.runnable import RunnableLambda
 
 from agents.state import AgentState
+from agents.nodes.summarization import SummarizationNode
+from agents.nodes.memory.retrieval import MemoryRetrievalNode
 
 
 class VisualizationDisplayNode:
@@ -49,6 +51,14 @@ class VisualizationDisplayNode:
         )
         # Invoke the model to display the visualization with image metadata
         visualization_display_model.invoke("...", config={"metadata": {"image": True}})
+
+        # Update agent's visualization summary
+        SummarizationNode.visualization_summarization(
+            state, state.visualization_action_plan, state.visualization_summary
+        )
+
+        # Add visualization to conversation memory
+        MemoryRetrievalNode.add_visualization(state, state.visualization)
 
         # Remove the completed subtask from the queue
         state.subtasks.popleft()

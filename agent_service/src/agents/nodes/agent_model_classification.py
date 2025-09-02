@@ -26,6 +26,7 @@ from agents.state import AgentState
 from agents.prompts.agent_mode_classification import AgentModeClassificationPrompt
 from agents.models.anthropic_ import low_temp_model
 from agents.nodes.memory.retrieval import MemoryRetrievalNode
+from agents.nodes.summarization import SummarizationNode
 
 
 class AgentModeClassificationNode(BaseNode):
@@ -81,8 +82,12 @@ class AgentModeClassificationNode(BaseNode):
             },
             config={"metadata": {"stream": False}},
         ).content
+        
+        # Summarize user preferences
+        SummarizationNode.user_preferences_summarization(state, state.question, state.user_preferences_summary)
 
         print("MODE:", state.agent_mode)
+        print("USER PREFERENCES:", state.user_preferences_summary, "\n\n")
 
         return state
 

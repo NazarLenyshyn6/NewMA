@@ -1,4 +1,27 @@
-"""..."""
+"""
+This module defines the `CodeDebuggingPrompt` class, which provides a
+LangChain `ChatPromptTemplate` configuration for debugging and repairing
+broken Python code in a **strict, FAANG-level execution environment**.
+
+The prompt enforces:
+    - Production-grade rigor for every instruction step.
+    - Error-aware continuation that **fixes the most recent error only**.
+    - Immediate execution of all instructions as raw Python code.
+    - Extreme safety rules for variable use, indexing, and data access.
+    - Comprehensive structured reporting in `analysis_report`.
+
+All generated code must:
+    - Be efficient, correct, and executable immediately with `exec()`.
+    - Build incrementally on existing variables without overwriting them.
+    - Execute every instruction step sequentially, with no omissions.
+    - Log detailed insights, findings, metrics, and safety notes in
+      `analysis_report`.
+
+This makes the prompt suitable for environments where:
+    - Errors in generated ML/analytics code must be recovered from seamlessly.
+    - Execution must remain safe, deterministic, and fully logged.
+    - The system must maintain continuity with prior user code and results.
+"""
 
 from langchain.prompts import (
     ChatPromptTemplate,
@@ -8,63 +31,173 @@ from langchain.prompts import (
 
 
 class CodeDebuggingPrompt:
-    """..."""
+    """Prompt template for FAANG-level debugging of broken code.
+
+    This class defines a **single unified prompt** (`UNIFIED`) used to
+    acknowledge, repair, and resume execution after an error in the
+    user’s code. The repaired code is executed immediately, and all
+    operations are logged in `analysis_report`.
+
+    Key responsibilities:
+        - Briefly acknowledge the prior error, then continue seamlessly.
+        - Only repair the provided broken code (no speculative fixes).
+        - Translate the user’s instruction plan into raw, executable Python.
+        - Enforce strict execution safety (variable existence, type checks,
+          safe indexing, no shadowing or overwriting).
+        - Record every action, metric, trade-off, and finding in
+          `analysis_report`.
+
+    Attributes:
+        UNIFIED:
+            A composite prompt that combines:
+                - System instructions:
+                    Define strict execution, safety, and reporting rules for
+                    fixing broken code.
+                - Human message templates:
+                    1. `code_summary` and available variables context.
+                    2. The broken code snippet and error message.
+                    3. The original user question for tone/style alignment.
+
+            Guarantees:
+                - Generates **raw executable Python only** (no markdown,
+                  comments, or placeholders).
+                - Ensures every step is executed immediately.
+                - Produces a detailed `analysis_report` with enriched structured
+                  logs at FAANG engineering standards.
+    """
 
     UNIFIED: ChatPromptTemplate = ChatPromptTemplate.from_messages(
         [
             SystemMessagePromptTemplate.from_template(
-                """
-The user is working on **any code-related task** (scripts, ML, data analysis, or applications) with code already available.
+                "The user is currently working on **technical machine learning and data analysis tasks** involving data that is **already available** within the system."
+                "__"
+                " ## EXTREME TECHNICAL EXECUTION PRINCIPLES (FAANG-LEVEL)"
+                """1. **Production-Grade Technical Rigor** — Treat every instruction as a real-world, high-performance ML/data engineering step.  
+                    - Analyze algorithms, modeling strategies, trade-offs, time/space complexity, and design patterns **for every operation**.  
+                    - Optimize all steps for efficiency, correctness, and scalability.  
+                    - Make internal reasoning explicit in the code logic and in `analysis_report` without altering any execution rules.  
 
-## STRICT DEBUGGING PRINCIPLES
+                    2. **Insight-Rich Reporting** — Every action must append to `analysis_report`:  
+                    - Computed metrics, intermediate results, algorithmic rationale, trade-offs, and subtle findings.  
+                    - If a step is skipped for safety, log the reason and its impact.  
+                    - Ensure every entry is meaningful, precise, and actionable at FAANG engineering level.
 
-1. **Mandatory Fix Guarantee** —  
-   - You MUST return working code where the reported error is resolved.  
-   - Never return code that still contains the same error.  
+                    3. **Stepwise Execution for Reliability** — Decompose instructions internally to ensure correctness, but execute immediately:  
+                    - Only generate executable Python code.  
+                    - Each step builds incrementally on previous variables.  
+                    - Anticipate full context for correctness and efficiency, but do not expose multi-step planning externally.  """
+                "IMPORTANT: A previous error occurred in the user’s code snippet. The continuation now naturally fixes that error and resumes execution without breaking flow.\n"
+                "Briefly note that the error happened and is being fixed, then continue seamlessly.\n"
+                "Do not search for or identify any other potential errors.\n"
+                "You must produce the smallest possible one-time-use Python code that performs ALL steps in the instruction plan exactly as written, in the exact order given.\n"
+                "Every step is executed immediately — no placeholders, no deferred execution, no skipped steps, and no omissions.\n"
+                "Your code is a direct, literal translation of the instruction text into executable Python, run right now, producing actual results.\n"
+                "You do not build frameworks, reusable functions, or generalized utilities. This code is not meant for future reuse.\n"
+                "You never alter, reorder, simplify, or interpret beyond exactly what the instruction specifies.\n"
+                "---\n\n"
+                "- You are solving the user’s problem directly — **not** building a framework, plan, or placeholder.\n"
+                "- Always produce **efficient, fully executable Python code** that runs immediately in real time.\n"
+                "- Every instruction must be executed without delay or deferral.\n"
+                "- All operations must be traced and logged in the `analysis_report`, capturing every step’s execution, metrics, findings, and context, using both the recommended keys and any additional meaningful keys relevant to the step.\n"
+                "- Include **all** meaningful keys for each step — not just the limited list — ensuring complete coverage for deep analysis.\n"
+                "- Nothing is “held” for later — all actions happen **now**.\n"
+                "- The entire execution is tracked so the `analysis_report` can serve as an advanced, detailed, FAANG-level operational record.\n"
+                "- Carefully and deeply analyze the entire detailed instruction provided.\n"
+                "- Fully understand its intent, dependencies, and implications before generating any code.\n"
+                "- Translate the instruction into safe, raw, executable Python code that performs all required data transformations, computations, and insight generation directly.\n"
+                "- Your generated code must be fully executable immediately with `exec()` without further edits or additions.\n"
+                "- All variables must be declared or assigned in the global scope to ensure they persist after execution.\n"
+                "- Every step must be actively invoked or called — avoid only defining functions or classes without execution.\n"
+                "- The code must build incrementally on all prior defined variables and transformations, respecting their current state and values.\n"
+                "- Do NOT redefine or shadow prior variables.\n"
+                "- DO NOT interpret, simplify, or omit any part of the instruction — implement it faithfully and completely.\n"
+                "- When recreating or regenerating any user data (partial or full DataFrame), always store it in a NEW DataFrame variable — never overwrite an existing one.\n"
+                "**STRICT CODE EXECUTION & SAFETY REQUIREMENTS:**\n"
+                "- NO runtime errors, undefined variables, or unsafe operations.\n"
+                "- All variables must be explicitly and safely initialized before use.\n"
+                "- Add explicit guards for `None`, `NaN`, missing keys, empty data, or invalid input.\n"
+                "- ONLY access dict keys or Series values via `.get(key, default)` or safe indexing.\n"
+                "- Use ONLY the following libraries: {dependencies} — NO others.\n"
+                "- ALWAYS IMPORT LIBRARIES.\n"
+                "- DO NOT import deprecated, insecure, or unsafe libraries.\n"
+                "- Do NOT load data — dataset is preloaded.\n"
+                "- DO NOT modularize — generate only flat, step-by-step Python code.\n"
+                "- DO NOT reference variables unless they have been clearly defined above.\n"
+                "- Maintain consistent naming — no renaming of known variables.\n"
+                "- **You MUST NEVER check for the existence of `df` — it is always available.**\n"
+                "**RESPECTING VARIABLE TYPES AND AVAILABILITY:**\n"
+                "- Confirm variables exist and match expected type before use.\n"
+                "- Skip safely if a variable is missing and log it.\n"
+                "- Ensure NameError, KeyError, or type misuse cannot occur.\n"
+                "**CODE STRUCTURE & CONTINUITY:**\n"
+                "- Ensure all intermediate results and computations are stored in globally accessible variables.\n"
+                "- Never create synthetic data unless explicitly instructed.\n"
+                "**ERROR PREVENTION AND VARIABLE SAFETY:**\n"
+                "- Before performing operations, confirm types strictly match expected.\n"
+                "- Guard all indexing operations.\n"
+                "- Skip unsafe steps and log in `analysis_report`.\n"
+                "⚠️ **GLOBAL ERROR-PREVENTION RULES (APPLY TO ALL MODES):**  "
+                "- Absolutely **no runtime errors** are allowed.  "
+                "- Deeply track all available variables, their names, memory scope, and types."
+                "- Reuse variables only if they are guaranteed to exist and have the correct type."
+                "- Never shadow, overwrite, or redefine existing variables incorrectly. "
+                "- All dataset columns must be validated before access. "
+                "- Always guard against `None`, `NaN`, empty data, missing keys, or type mismatches."
+                "- All variables must be explicitly initialized before use.  "
+                "- All Python code must be fully executable with `exec()` immediately, without edits."
+                "- Only allowed libraries may be used, all explicitly imported."
+                "- No unsafe, deprecated, or unlisted libraries. "
+                "- All outputs must be in a single ```python``` block."
+                "- Analyze memory and type state of all variables before generating code. "
+                """⚠️ **VARIABLE REUSE RULE:**  
+                - Always use the exact variable name as defined previously.  
+                - Do not rename, alias, or create a similar variable to refer to existing data.  
+                - Check that the variable exists and has the correct type before using it.  
+                - Incorrect naming when reusing variables must never occur.
 
-2. **Minimal Surgical Fix Only** —  
-   - Apply the smallest possible change to fix the reported error.  
-   - Do NOT add, remove, reorder, refactor, or optimize anything beyond the exact broken part.  
-   - The structure, style, and logic of the original code must remain identical except for the fix.  
-
-3. **Error-Centric Reasoning** —  
-   - First, clearly restate the reported error.  
-   - Then explain briefly why it happened and what exact fix is needed.  
-   - Finally, return the corrected code.  
-
-4. **Strict Output Rules** —  
-   - Output must be **directly executable** and free of the reported error.  
-   - Preserve all existing variables, functions, and structures.  
-   - No placeholders, no speculative fixes, no extra edits.  
-
-5. **Seamless Debugging Continuation** —  
-   - Begin by acknowledging that the previous code failed.  
-   - Transition naturally into applying the fix.  
-   - Example: *“The previous code failed with a `TypeError` because X. To fix this, here is the corrected version...”*
-
-**UNIVERSAL RULE:** Always return the **same code back**, with only the minimal fix applied so the error is resolved.
-"""
+                ⚠️ **STRICT DICTIONARY & KEY ACCESS RULE:**  
+                - Never assume a key exists in any dictionary or mapping.  
+                - Before accessing a key, **always check for its presence** using safe access patterns (e.g., `.get('key')` or `if 'key' in dict:`).  
+                - Any KeyError caused by missing keys is strictly forbidden.  
+                - If a key is missing, handle it safely and log the skip in `analysis_report`.  
+                - This applies to all dictionaries, including metrics, configuration mappings, and result aggregations.  
+                - Never hardcode key access without validation."""
+                "**REPORTING FORMAT:**\n"
+                "- Start with: `analysis_report = []`\n"
+                "- After each step, append a dict with keys: 'step', 'why', 'finding', 'action', 'data_summary', 'alerts', 'recommendation', 'execution_time', 'metrics' + any additional meaningful keys.\n"
+                "- Capture maximum possible insight for every operation.\n"
+                "**BEHAVIOR RULES:**\n"
+                "- You are not a planner — you EXECUTE.\n"
+                "- NO markdown, print, or comments.\n"
+                "- Only raw, valid Python code.\n"
+                "- Maintain continuity with prior code.\n"
+                "- AFTER generated code, you FINISH.\n\n"
+                "**DATASET CONTEXT:**\n"
+                "{dataset_summary}\n"
+                "Only operate on explicitly described dataset structure."
             ),
             HumanMessagePromptTemplate.from_template(
                 "**Summary of Previously Executed Code and Variables:**\n"
                 "{code_summary}\n\n"
                 "**CURRENTLY AVAILABLE VARIABLES:**\n"
                 "{variables}\n"
-                "Use only these existing variables unless the fix explicitly requires defining something new."
+                "Use only these existing variables unless explicitly creating a new one to meet an instruction step."
             ),
             HumanMessagePromptTemplate.from_template(
                 "**Broken code:**\n"
                 "{code}\n\n"
                 "**Error message:**\n"
                 "{error_message}\n\n"
-                "**User question / tone/style reference:**\n"
+                "**User question (tone/style reference):**\n"
                 "{question}\n\n"
-                "**STRICT INSTRUCTIONS:**\n"
-                "- Acknowledge the code failed with the reported error.\n"
-                "- Identify and explain the minimal correction.\n"
-                "- Return the **same code back**, identical except for the fixed error.\n"
-                "- Do NOT reorder, rewrite, or add anything extra.\n"
-                "- Final output must be the corrected, working code."
+                "**IMPORTANT:**\n"
+                "- Explicitly acknowledge that an error occurred and that you are now fixing it.\n"
+                "- Do this briefly and naturally, so it feels like a continuation of the previous execution, not a mode shift.\n"
+                "- Only fix the provided broken code — do not search for any other potential errors.\n"
+                "- Start with: `analysis_report = []`\n"
+                "- After each logical step, append enriched structured reports using only relevant keys from the approved list.\n"
+                "- End with final enriched summary.\n"
+                "- ALL code must run actions immediately."
             ),
         ]
     )

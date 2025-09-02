@@ -54,6 +54,7 @@ agent_service/
     │   │   ├── conditional_routing.py         # Conditional routing logic
     │   │   ├── context_advising.py           # Context-aware advisory
     │   │   ├── direct_responding.py          # Direct response generation
+    │   │   ├── fallback_handling.py          # Fallback error handling
     │   │   ├── subtask_classification.py     # Subtask categorization
     │   │   ├── summarization.py             # Content summarization
     │   │   ├── analysis/        # Analysis-specific nodes
@@ -199,6 +200,7 @@ The `AgentGraphBuilder` constructs sophisticated execution workflows using LangG
 - **Subtask Classification**: Categorizes subtasks for specialized handling
 - **Context Advising**: Provides contextual guidance and recommendations
 - **Direct Responding**: Handles simple queries requiring immediate responses
+- **Fallback Handling**: Manages error scenarios and provides fallback responses
 
 **Analysis Workflow**:
 - **Analysis Action Planning**: Develops structured analysis strategies
@@ -424,7 +426,7 @@ The system employs sophisticated conditional routing based on execution context:
 **From Code Executor**:
 - Execution success → Report/Visualization Generation
 - Execution errors → Code Debugging (with retry limits)
-- Fallback scenarios → Graceful error handling
+- Fallback scenarios → Fallback Handling Node for graceful error recovery
 
 ### Memory-Driven Context Management
 
@@ -670,7 +672,7 @@ The service implements comprehensive error handling:
 - **Code Execution Errors**: Automatic debugging with up to 5 retry attempts
 - **Memory Access Errors**: Graceful fallback to database on cache failures
 - **Model API Errors**: Retry logic with exponential backoff for Anthropic API calls
-- **Workflow Errors**: Fallback routing to simpler execution paths
+- **Workflow Errors**: Fallback routing to simpler execution paths via dedicated Fallback Handling Node
 
 ### Data Processing Error Handling
 

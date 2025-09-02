@@ -65,6 +65,13 @@ code_generation_model = create_anthropic_model(
     top_p=1,
 )
 
+code_debugging_model = create_anthropic_model(
+    temperature=0.25,
+    max_tokens=50000,
+    streaming=True,
+    top_p=1,
+)
+
 summarization_model = create_anthropic_model(
     temperature=0.0,
     max_tokens=40000,

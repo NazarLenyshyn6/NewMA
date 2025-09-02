@@ -61,10 +61,23 @@ class MemorySaveNode:
             session_id=state.session_id,
             file_name=state.file_name,
             storage_uri=state.storage_uri,
-            analysis_summary=pickle.dumps(state.analysis_summary),
-            visualization_summary=pickle.dumps(state.visualization_summary),
-            code_summary=pickle.dumps(state.code_summary),
-            variables=pickle.dumps(state.variables),
+            analysis_summary=(
+                pickle.dumps(state.analysis_summary) if state.analysis_summary else None
+            ),
+            visualization_summary=(
+                pickle.dumps(state.visualization_summary)
+                if state.visualization_summary
+                else None
+            ),
+            code_summary=(
+                pickle.dumps(state.code_summary) if state.code_summary else None
+            ),
+            pending_context=(
+                pickle.dumps(state.pending_context)
+                if state.pending_context
+                else pickle.dumps(f"Last Question\n: {state.question}")
+            ),
+            variables=pickle.dumps(state.variables) if state.variables else None,
             conversation=pickle.dumps(conversation + state.new_conversation),
         )
 

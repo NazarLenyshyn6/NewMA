@@ -182,6 +182,7 @@ class MemoryService:
             visualization_summary=pickle.dumps(""),
             code_summary=pickle.dumps(""),
             user_preferences_summary=pickle.dumps(""),
+            pending_context=pickle.dumps(""),
             variables=pickle.dumps({"df": df}),
             conversation=pickle.dumps([]),
         )
@@ -207,6 +208,7 @@ class MemoryService:
         visualization_summary: Optional[bytes] = None,
         code_summary: Optional[bytes] = None,
         user_preferences_summary: Optional[bytes] = None,
+        pending_context: Optional[bytes] = None,
         variables: Optional[bytes] = None,
         conversation: Optional[bytes] = None,
     ):
@@ -251,6 +253,9 @@ class MemoryService:
 
         if user_preferences_summary is not None:
             memory_history.user_preferences_summary = user_preferences_summary
+
+        if pending_context is not None:
+            memory_history.pending_context = pending_context
 
         if variables is not None:
             memory_history.variables = variables

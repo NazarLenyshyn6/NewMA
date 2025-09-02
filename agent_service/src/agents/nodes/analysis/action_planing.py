@@ -48,6 +48,7 @@ class AnalysisActionPlaningNode(BaseNode):
         """
 
         print("* AnalysisActionPlaningNode -> ")
+        print("ANALYSIS SUMMARY:", state.analysis_summary, "\n\n")
 
         # Use the first subtask and prior analysis summary to guide action planning
         state.analysis_action_plan = self._chain.invoke(

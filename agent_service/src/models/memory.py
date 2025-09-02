@@ -54,5 +54,6 @@ class Memory(Base):
     visualization_summary: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     code_summary: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     user_preferences_summary: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    pending_context: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     variables: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     conversation: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)

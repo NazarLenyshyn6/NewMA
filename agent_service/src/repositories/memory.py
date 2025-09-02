@@ -117,6 +117,9 @@ class MemoryRepository:
                 memory_schema.user_preferences_summary
             )
 
+        if memory_schema.pending_context is not None:
+            memory_history.pending_context = memory_schema.pending_context
+
         if memory_schema.variables is not None:
             memory_history.variables = memory_schema.variables
 

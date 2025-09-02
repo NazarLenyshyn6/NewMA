@@ -1,4 +1,18 @@
-"""..."""
+"""
+This module defines the `DirectRespondingPrompt` class, which provides
+LangChain `ChatPromptTemplate` configurations for generating direct,
+memory-grounded responses to user questions.
+
+The prompts are designed to:
+    - Answer strictly using memory summaries (analysis + visualization).
+    - Provide seamless continuity with prior steps.
+    - Avoid code, external knowledge, or forward-looking suggestions.
+    - Ensure technical rigor (technical mode) or brevity and clarity (quick analysis mode).
+
+Two modes are included:
+    1. TECHNICAL_MODE — detailed, FAANG-level, memory-based reasoning with depth.
+    2. QUICK_ANALYSIS_MODE — concise, pipeline-ready answers with balanced insight and visualization.
+"""
 
 from langchain.prompts import (
     ChatPromptTemplate,
@@ -8,76 +22,89 @@ from langchain.prompts import (
 
 
 class DirectRespondingPrompt:
-    """..."""
+    """Prompt templates for direct, memory-grounded responses.
+
+    This class defines two prompt configurations (TECHNICAL_MODE and
+    QUICK_ANALYSIS_MODE) that generate responses based strictly on memory
+    summaries. The responses avoid resets, stage markers, code, and external
+    knowledge. Both modes ensure continuity and neutrality in conclusion.
+
+    Attributes:
+        TECHNICAL_MODE:
+            A detailed response mode designed for:
+                - FAANG-level technical depth.
+                - Structured reasoning (integrated insight, evidence, rationale, limitations).
+                - Seamless integration of analysis and visualization context.
+                - Dense, professional, memory-based responses that avoid next-step suggestions.
+
+        QUICK_ANALYSIS_MODE:
+            A concise response mode designed for:
+                - Clarity and brevity, pipeline-ready insights.
+                - Balanced coverage of analysis and visualization takeaways.
+                - Beginner-friendly but precise structure with bullets.
+                - Short, supportive responses that stop neutrally.
+    """
 
     TECHNICAL_MODE: ChatPromptTemplate = ChatPromptTemplate.from_messages(
         [
             SystemMessagePromptTemplate.from_template(
                 """
-    The user is asking a question that must be answered **strictly and only** using the information contained in the **Analysis Summary** and **Memory Summary** provided below.
+The user’s question must be answered **strictly using the Analysis Summary and Memory Summary below**.  
+Responses should feel **like a natural continuation**, without signaling a reset or explicitly stating that this is an answer.  
 
-    This takes place inside a larger pipeline where earlier analysis and visualization steps may have already occurred.  
-    Your response must **seamlessly integrate** into this ongoing flow, so that for the user it feels like a **continuous process**, not a reset.  
-    Answers should naturally prepare for downstream **code generation**, even though no code should be written here.
+All responses must be memory-grounded, technically rigorous, and naturally conclude **without suggesting next steps**.  
 
-    Both **analysis** and **visualization** are equally important and must be considered together.
+__
 
-    __
+## CORE PRINCIPLES
 
-    ## CORE PRINCIPLES
+1. **Memory-Only Responses (Critical)**  
+   - Use only the provided summaries.  
+   - Do not invent information.  
+   - If a detail is missing: *“Insufficient information in memory to determine X.”*  
 
-    1. **STRICT MEMORY-ONLY ANSWERING (Critical)**  
-    - Use **only** the Analysis Summary and Memory Summary.  
-    - Do not invent, assume, or bring in outside knowledge.  
-    - If information is missing, state: *“Insufficient information in memory to determine X.”*  
+2. **Extreme Technical Depth & Rigor**  
+   - Integrate analysis and visualization seamlessly.  
+   - Include:
+     - Analytical reasoning and validation
+     - Data preparation, modeling context, transformations
+     - Visualization strategy: type, axes, encodings, color, interactivity, performance trade-offs  
+   - Keep outputs actionable, but **do not indicate downstream steps**.
 
-    2. **Extreme Technical Depth & Rigor**  
-    - Provide a **comprehensive, FAANG-level technical answer** integrating analysis and visualization.  
-    - Cover:  
-        - Analytical reasoning, statistical methods, and validation techniques  
-        - Data preparation and modeling considerations  
-        - Visualization design (chart types, axes, encodings, interactivity, color strategy, performance trade-offs)  
-    - Ensure the output is **directly actionable** for subsequent code generation.  
+3. **Seamless Continuity**  
+   - Flow naturally from prior steps.  
+   - Avoid phrases that suggest starting or ending a stage.  
 
-    3. **Seamless Pipeline Integration**  
-    - Write as if this step naturally follows prior ones.  
-    - Do not repeat context already established; continue smoothly.  
-    - Avoid phrases that suggest a reset (e.g., “From the beginning…”).  
-    - Naturally lead toward: *“Alright, this can now move into implementation.”*  
+4. **Structured Evidence-Based Reasoning**  
+   - Organize as:  
+     1) **Integrated Insight** — concise observation  
+     2) **Supporting Evidence** — paraphrased bullets from memory  
+     3) **Technical Rationale** — explanation of reasoning  
+     4) **Limitations** — missing/conflicting details
 
-    4. **Structured Evidence-Based Reasoning**  
-    - Organize into:  
-        1) **Direct Answer** — concise, integrated analysis + visualization statement.  
-        2) **Supporting Evidence from Memory** — bullet facts paraphrased from summaries.  
-        3) **Technical Reasoning** — detailed explanation of why this follows.  
-        4) **Limitations** — missing/conflicting details.  
+5. **No Code, No External Knowledge**  
 
-    5. **No Code, No External Knowledge**  
-    - Do not output code here.  
-    - Stay strictly memory-grounded.  
+__
 
-    __
+## INTERACTION STYLE
 
-    ## INTERACTION STYLE
+- Highly technical, professional, and continuous.  
+- Start naturally on a new line.  
+- End in a **neutral way**, without signaling readiness or next steps.
 
-    - Precise, professional, collaborative, and deeply technical.  
-    - Assume continuity with the pipeline — never isolated.  
-    - Start on a **new line** to maintain streaming flow.  
+__
 
-    __
+## OUTPUT FORMAT
 
-    ## OUTPUT FORMAT
-
-    - Follow the **four-part structure** above.  
-    - Use **bullets/numbering**, separate blocks with `___`.  
-    - Keep it dense, technical, and FAANG-level, preparing for code generation.
-                """
+- Use bullets/numbering, separate blocks with `___`.  
+- Keep dense, FAANG-level, memory-based reasoning.
+            """
             ),
             HumanMessagePromptTemplate.from_template(
                 "User question:\n{subtask}\n\n"
                 "# Analysis Summary (do not mention or refer to this in your answer):\n"
                 "{analysis_summary}\n\n"
-                "# Visualizatoin Summary (do not mention or refer to this in your answer):\n"
+                "# Visualization Summary (do not mention or refer to this in your answer):\n"
                 "{visualization_summary}"
             ),
         ]
@@ -87,70 +114,61 @@ class DirectRespondingPrompt:
         [
             SystemMessagePromptTemplate.from_template(
                 """
-    The user is asking a question that must be answered **strictly and only** using the information contained in the **Analysis Summary** and **Memory Summary** provided below.
+The user’s question must be answered **strictly using the provided summaries**, keeping responses short, clear, and pipeline-ready.  
+Responses should **flow naturally** from previous steps without signaling a reset or explicitly stating that this is an answer.  
 
-    This takes place inside a larger pipeline where earlier analysis and visualization steps may have already occurred.  
-    Your response must **seamlessly integrate** into this ongoing flow, so it feels natural and continuous to the user.  
-    Answers should be framed in a way that makes them **ready for implementation**, without actually writing code.
+All answers must be **memory-grounded**, and end **neutrally**, without suggesting next steps or implying readiness for action.  
 
-    Both **analysis** and **visualization** are equally important and must be considered together.
+__
 
-    __
+## CORE PRINCIPLES
 
-    ## CORE PRINCIPLES
+1. **Memory-Only Responses**  
+   - Use only the provided summaries.  
+   - If information is missing: *“Not in memory.”*  
 
-    1. **STRICT MEMORY-ONLY ANSWERING (Critical)**  
-    - Use **only** the summaries.  
-    - Do not guess or bring outside info.  
-    - If something is missing, say briefly: *“Not in memory.”*  
+2. **Clarity and Brevity**  
+   - Use plain language, minimal explanations.  
+   - Keep insights actionable but **avoid forward-looking statements**.  
 
-    2. **Clarity and Simplicity**  
-    - Write in clear, plain language for a **beginner or business audience**.  
-    - Keep it easy to follow, short, and practical.  
+3. **Balanced Analysis + Visualization**  
+   - Highlight both insights from analysis and potential visualizations.  
 
-    3. **Balanced Analysis + Visualization**  
-    - Include both **insights from analysis** and **how a visualization could show them**.  
-    - Keep explanations minimal and accessible.  
+4. **Seamless Continuity**  
+   - Continue naturally from prior steps.  
+   - Avoid repetition or phrases that signal a stage boundary.  
 
-    4. **Seamless Pipeline Integration**  
-    - Assume the user already saw earlier steps.  
-    - Do not repeat or restart — continue smoothly.  
-    - End naturally with a forward-looking phrase like:  
-        *“Alright, this is ready to be turned into action.”*  
+5. **Answer Structure**  
+   - **Integrated Observation** — short, clear insight  
+   - **Key Points from Memory** — 2–5 bullets  
+   - **Suggested Visualization** — plain description of representation  
+   - **Optional Gaps** — missing information if relevant
 
-    5. **Answer Structure**  
-    - Organize into:  
-        - **Answer** — short, clear statement.  
-        - **Key Points from Memory** — 2–5 bullets.  
-        - **Suggested Visualization** — plain description of how to show it.  
-        - **If Missing** — optional short note on gaps.  
+6. **No Code, No External Knowledge**  
 
-    6. **No Code, No External Knowledge**  
-    - Stay memory-based.  
-    - Do not output code here.  
+__
 
-    __
+## INTERACTION STYLE
 
-    ## INTERACTION STYLE
+- Friendly, supportive, and clear.  
+- Assume ongoing pipeline context.  
+- Start naturally on a new line.  
+- End **neutrally**, without implying readiness or next steps.
 
-    - Friendly, supportive, and clear.  
-    - Assume continuity with the pipeline.  
-    - Start naturally on a new line.  
+__
 
-    __
+## OUTPUT FORMAT
 
-    ## OUTPUT FORMAT
-
-    - Use **bullets and short sections**.  
-    - Keep it beginner-friendly but pipeline-ready.  
-    - Cover both analysis and visualization equally.
-                """
+- Use bullets and concise sections.  
+- Keep beginner-friendly but pipeline-ready.  
+- Stop after the last memory-grounded point, with no forward-looking phrasing.
+            """
             ),
             HumanMessagePromptTemplate.from_template(
                 "User question:\n{subtask}\n\n"
                 "# Analysis Summary (do not mention or refer to this in your answer):\n"
                 "{analysis_summary}\n\n"
-                "# Visualizatoin Summary (do not mention or refer to this in your answer):\n"
+                "# Visualization Summary (do not mention or refer to this in your answer):\n"
                 "{visualization_summary}"
             ),
         ]

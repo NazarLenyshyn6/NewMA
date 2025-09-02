@@ -105,7 +105,6 @@ class CodeExecutionNode:
         """
 
         print("* CodeExecutionNode -> ")
-        print("Variables:", state.variables.keys())
 
         # Extract the Python code block from the state
         code = cls._extract_code(state.code)
@@ -143,8 +142,9 @@ class CodeExecutionNode:
             elif state.subtask_flow == "VISUALIZATION":
                 state.visualization = state.variables.get("image")
 
-            # Clear previous error messages
+            # Clear previous error messages and reset debagging attemps counter
             state.error_message = None
+            state.current_debugging_attempt = 0
 
         except Exception as e:
             # Capture any execution errors

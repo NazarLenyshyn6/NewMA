@@ -1,4 +1,17 @@
-"""..."""
+"""
+
+This module defines the `SummarizationPrompt` class, which encapsulates reusable
+prompt templates for maintaining structured, authoritative summaries across
+different aspects of the ML workflow.
+
+The design enforces strict schema-driven summarization for:
+- **Analysis achievements** (ML tasks, results, insights).
+- **Visualization plans** (planned/executed plots and charts).
+- **Code state** (important persisted variables).
+- **User preferences** (mode and interaction style).
+- **Pending context** (latest actionable state and explicit user questions).
+
+"""
 
 from langchain.prompts import (
     ChatPromptTemplate,
@@ -8,7 +21,43 @@ from langchain.prompts import (
 
 
 class SummarizationPrompt:
-    """..."""
+    """Centralized container for standardized summarization prompt templates.
+
+    This class provides reusable LangChain `ChatPromptTemplate` objects
+    for structured summarization across multiple ML workflow dimensions.
+    Each attribute represents a distinct summarization domain with
+    strict formatting and incremental update rules.
+
+    Attributes:
+        ANALYSIS :
+            Template for maintaining a sectioned, incremental summary of ML
+            analysis results. Captures only key achievements, insights,
+            and workflow milestones while excluding trivial details.
+
+        VISUALIZATION :
+            Template for maintaining a sectioned, incremental summary of
+            planned and executed visualizations. Excludes redundant or
+            low-value plots, focusing only on those important for workflow
+            understanding.
+
+        CODE :
+            Template for maintaining a sectioned, incremental summary of
+            persistent Python variables after code execution. Includes only
+            meaningful state (e.g., datasets, key results) while filtering
+            out temporary or irrelevant variables.
+
+        USER_PREFERENCES :
+            Template for maintaining a concise, incremental summary of the
+            user’s preferences, specifically:
+                - Preferred mode (Deep Technical, Quick Analysis, Study)
+                - Action style (Immediate execution or Requires confirmation)
+
+        PENDING_CONTEXT :
+            Template for maintaining the most recent actionable state,
+            capturing:
+                - Immediate Action (derived from the latest model suggestion)
+                - Last Question (from the most recent explicit user query)
+    """
 
     ANALYSIS: ChatPromptTemplate = ChatPromptTemplate.from_messages(
         [
@@ -159,6 +208,46 @@ class SummarizationPrompt:
                 "{user_preferences_summary}\n\n"
                 "Task: Incrementally update the summary of the user's **preferred mode** and **action style only**. "
                 "Update existing entries immediately if preferences change. Exclude any other behavior or details."
+            ),
+        ]
+    )
+
+    PENDING_CONTEXT: ChatPromptTemplate = ChatPromptTemplate.from_messages(
+        [
+            SystemMessagePromptTemplate.from_template(
+                "You are an **expert pending context summarizer** responsible for maintaining the short-term actionable state "
+                "based only on the latest user interaction and model suggestions.\n\n"
+                "**Your mission:** Maintain a single, authoritative, **sectioned summary** capturing ONLY:\n"
+                "  1. The most recent suggested action from the model (found inside the provided 'Context') under 'Immediate Action'\n"
+                "  2. The most recent explicit user question under 'Last Question'\n\n"
+                "**Important nuances:**\n"
+                "  - Any model suggestion or offer phrased as a question inside 'Context' must be **converted into a concise actionable command** for Immediate Action.\n"
+                "    Example: 'Would you like me to help you figure out which approach might work best?' becomes 'Help figure out which approach might work best.'\n"
+                "  - Execution or decision to act is **not part of the summary**; Immediate Action only stores the command.\n"
+                "  - Always update these sections immediately with the latest input.\n"
+                "  - If no suggested action exists in 'Context', set 'Immediate Action: None'.\n"
+                "  - Exclude all unrelated details.\n\n"
+                "### STRICT RULES ###\n"
+                "1. Only track the most recent **Immediate Action** (from Context) and **Last Question** (from Question).\n"
+                "2. Never remove sections; always keep both present, updating values as needed.\n"
+                "3. Format strictly:\n\n"
+                "SECTION: Immediate Action\n"
+                "  - <One-line actionable command derived from the most recent model suggestion in Context, or 'None'>\n\n"
+                "SECTION: Last Question\n"
+                "  - <One-line summary of the user’s most recent explicit question>\n\n"
+                "4. The summary must always reflect the **current state** of pending context.\n"
+                "5. Misclassification, paraphrasing unrelated content, or leaving questions unconverted is a critical error."
+            ),
+            HumanMessagePromptTemplate.from_template(
+                "### New User Interaction Data ###\n"
+                "Question: {question}\n"
+                "Context: {context}\n\n"
+                "### Previous Pending Context Summary ###\n"
+                "{pending_context}\n\n"
+                "Task: Incrementally update the summary with:\n"
+                "  - **Immediate Action** (extracted and converted from Context)\n"
+                "  - **Last Question** (from Question)\n"
+                "Overwrite old values with the most recent ones only."
             ),
         ]
     )

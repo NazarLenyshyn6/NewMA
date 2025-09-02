@@ -57,12 +57,18 @@ class ContextAdvisingNode(BaseNode):
                 "question": state.question,
                 "analysis_summary": state.analysis_summary,
                 "visualization_summary": state.visualization_summary,
+                "pending_context": state.pending_context,
             }
         ).content
 
         # Update the analysis summary with the generated advice
         SummarizationNode.analysis_summarization(
             state, context_advise, state.analysis_summary
+        )
+
+        # Update pending context with new suggestion and question
+        SummarizationNode.pending_context_summarization(
+            state, state.question, context_advise, state.pending_context
         )
 
         # Record the generated advice in memory for conversation history
@@ -89,6 +95,7 @@ class ContextAdvisingNodeRegistry:
         model=high_temp_model, prompt=ContextAdvisingPrompt.TECHNICAL_MODE
     )
 
+    # Node for quick beginner friendly context advice
     QUICK_ANALYSIS_MODE: ContextAdvisingNode = ContextAdvisingNode(
         model=high_temp_model, prompt=ContextAdvisingPrompt.QUICK_ANALYSIS_MODE
     )

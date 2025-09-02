@@ -54,6 +54,7 @@ class TaskDecompositionNode(BaseNode):
                 "question": state.question,
                 "analysis_summary": state.analysis_summary,
                 "visualization_summary": state.visualization_summary,
+                "pending_context": state.pending_context,
             },
             config={"metadata": {"stream": False}},
         ).subtasks

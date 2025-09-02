@@ -125,3 +125,30 @@ class SummarizationNode:
             },
             config={"metadata": {"stream": False}},
         ).content
+
+    @staticmethod
+    def pending_context_summarization(
+        state: AgentState, question: str, context: str, pending_context: str
+    ):
+        """
+        Summarize the pending context based on the current question and agent state.
+
+        Args:
+            state: The current agent execution state.
+            question: The current user query.
+            context: The current context of the agent’s execution.
+            pending_context: Previous pending context awaiting confirmation or execution.
+
+        Updates:
+            state.pending_context: The newly generated, condensed pending context summary.
+        """
+        print("* PendingContextSummarizationNode -> ")
+        chain = SummarizationPrompt.PENDING_CONTEXT | low_temp_model
+        state.pending_context = chain.invoke(
+            {
+                "question": state.question,
+                "context": context,
+                "pending_context": state.pending_context,
+            },
+            config={"metadata": {"stream": False}},
+        ).content

@@ -48,6 +48,7 @@ class Memory(BaseSchema):
     visualization_summary: Optional[bytes]
     code_summary: Optional[bytes]
     user_preferences_summary: Optional[bytes]
+    pending_context: Optional[bytes]
     variables: Optional[bytes]
     conversation: Optional[bytes]
 

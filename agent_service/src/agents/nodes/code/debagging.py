@@ -15,7 +15,7 @@ from typing import override
 from agents.nodes.base import BaseNode
 from agents.state import AgentState
 from agents.prompts.code_debagging import CodeDebuggingPrompt
-from agents.models.anthropic_ import low_temp_model
+from agents.models.anthropic_ import code_debugging_model
 from agents.nodes.memory.retrieval import MemoryRetrievalNode
 
 
@@ -56,7 +56,9 @@ class CodeDebuggingNode(BaseNode):
         # Generate corrected code based on current code, error message, and context
         state.code = self._chain.invoke(
             {
-                "question": state.question,
+                "question": state.subtasks[0],
+                "dependencies": state.dependencies,
+                "dataset_summary": state.dataset_summary,
                 "code": state.code,
                 "error_message": state.error_message,
                 "code_summary": state.code_summary,
@@ -65,10 +67,12 @@ class CodeDebuggingNode(BaseNode):
         ).content
 
         # Increment the debugging attempt counter
-        state.current_debugging_attempt += 1
+        state.current_debugging_attempt = state.current_debugging_attempt + 1
 
         # Record the updated code in memory for tracking
         MemoryRetrievalNode.add_answer(state, state.code)
+
+        return state
 
 
 class CodeDebaggingNodeRegistry:
@@ -83,5 +87,5 @@ class CodeDebaggingNodeRegistry:
 
     # Preconfigured node for unified code debuggings
     UNIFIED: CodeDebuggingNode = CodeDebuggingNode(
-        model=low_temp_model, prompt=CodeDebuggingPrompt.UNIFIED
+        model=code_debugging_model, prompt=CodeDebuggingPrompt.UNIFIED
     )

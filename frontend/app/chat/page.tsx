@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info, Save, ChevronDown, ChevronRight, Move, Maximize2, Minimize2, RefreshCw, BookOpen } from 'lucide-react';
+import { Send, Plus, Menu, X, MessageSquare, User, MoreVertical, FileText, File, Copy, Check, Bot, Upload, PaperclipIcon, LogOut, Database, Zap, ArrowRight, Trash2, Info, Save, ChevronDown, ChevronRight, Move, Maximize2, Minimize2, RefreshCw, BookOpen, Download } from 'lucide-react';
 import { apiEndpoints, getAuthHeaders } from '@/lib/api';
+import jsPDF from 'jspdf';
 
 interface Session {
   id: string;
@@ -20,7 +21,7 @@ interface Message {
 
 interface ChatHistoryItem {
   question: string;
-  answer: string;
+  answer: string | string[];
 }
 
 interface FileItem {
@@ -152,6 +153,783 @@ const ChatPage: React.FC = () => {
       console.error('Failed to copy message:', err);
     }
   };
+
+  // Legacy export conversation to PDF with proper parsing like frontend
+  const exportToPDFLegacy = async () => {
+    if (messages.length === 0) {
+      alert('No conversation to export');
+      return;
+    }
+
+    try {
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 20;
+      const maxWidth = pageWidth - 2 * margin;
+      let currentY = margin;
+
+      // Helper function to add text with proper formatting
+      const addFormattedText = (text: string, fontSize = 10, font = 'helvetica', style = 'normal') => {
+        pdf.setFontSize(fontSize);
+        pdf.setFont(font, style);
+        const lines = pdf.splitTextToSize(text, maxWidth);
+        for (const line of lines) {
+          if (currentY > pageHeight - 20) {
+            pdf.addPage();
+            currentY = margin;
+          }
+          pdf.text(line, margin, currentY);
+          currentY += fontSize * 0.6;
+        }
+        currentY += 3;
+      };
+
+      // Helper function to parse markdown-like formatting for PDF
+      const parseMarkdownForPDF = (text: string) => {
+        if (!text) return [];
+        
+        const elements = [];
+        const lines = text.split('\n');
+        
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const trimmedLine = line.trim();
+          
+          if (!trimmedLine) {
+            elements.push({ type: 'break' });
+            continue;
+          }
+          
+          // Headers
+          const headerMatch = trimmedLine.match(/^(#{1,6})\s+(.+)$/);
+          if (headerMatch) {
+            const level = headerMatch[1].length;
+            const text = headerMatch[2];
+            elements.push({ 
+              type: 'header', 
+              level, 
+              text,
+              fontSize: Math.max(14 - level, 10)
+            });
+            continue;
+          }
+          
+          // Bullet points
+          if (trimmedLine.match(/^[•*-]\s+/)) {
+            const text = trimmedLine.replace(/^[•*-]\s+/, '');
+            elements.push({ type: 'bullet', text });
+            continue;
+          }
+          
+          // Numbered lists
+          const numberedMatch = trimmedLine.match(/^(\d+)\. (.+)$/);
+          if (numberedMatch) {
+            const number = numberedMatch[1];
+            const text = numberedMatch[2];
+            elements.push({ type: 'numbered', number, text });
+            continue;
+          }
+          
+          // Code blocks are handled separately
+          // Table detection
+          if (trimmedLine.includes('|') && lines[i + 1] && lines[i + 1].includes('|')) {
+            // Simple table handling
+            elements.push({ type: 'table_row', text: trimmedLine });
+            continue;
+          }
+          
+          // Regular paragraph
+          elements.push({ type: 'paragraph', text: trimmedLine });
+        }
+        
+        return elements;
+      };
+
+      // Add title
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      const title = `Chat Conversation - ${currentSession?.title || 'Untitled Session'}`;
+      pdf.text(title, margin, currentY);
+      currentY += 25;
+
+      // Add timestamp
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Exported on: ${new Date().toLocaleString()}`, margin, currentY);
+      currentY += 20;
+
+      // Process each message
+      for (let i = 0; i < messages.length; i++) {
+        const message = messages[i];
+        const isUser = message.role === 'user';
+        
+        // Check if we need a new page
+        if (currentY > pageHeight - 60) {
+          pdf.addPage();
+          currentY = margin;
+        }
+
+        // Add role header
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        const roleText = isUser ? '👤 User' : '🤖 Assistant';
+        pdf.text(roleText, margin, currentY);
+        currentY += 18;
+
+        // Parse message content using same logic as frontend
+        const parts = parseMessageContent(message.content);
+        
+        for (const part of parts) {
+          if (part.type === 'text') {
+            // Parse the text content with markdown formatting
+            const markdownElements = parseMarkdownForPDF(part.content);
+            
+            for (const element of markdownElements) {
+              if (currentY > pageHeight - 30) {
+                pdf.addPage();
+                currentY = margin;
+              }
+              
+              switch (element.type) {
+                case 'header':
+                  pdf.setFontSize(element.fontSize || 12);
+                  pdf.setFont('helvetica', 'bold');
+                  pdf.text(element.text || '', margin, currentY);
+                  currentY += (element.fontSize || 12) * 0.8 + 5;
+                  break;
+                  
+                case 'bullet':
+                  pdf.setFontSize(10);
+                  pdf.setFont('helvetica', 'normal');
+                  pdf.text('• ' + (element.text || ''), margin + 10, currentY);
+                  currentY += 14;
+                  break;
+                  
+                case 'numbered':
+                  pdf.setFontSize(10);
+                  pdf.setFont('helvetica', 'normal');
+                  pdf.text(`${element.number || ''}. ${element.text || ''}`, margin + 10, currentY);
+                  currentY += 14;
+                  break;
+                  
+                case 'table_row':
+                  pdf.setFontSize(9);
+                  pdf.setFont('helvetica', 'normal');
+                  const cells = (element.text || '').split('|').map(cell => cell.trim()).filter(cell => cell);
+                  pdf.text(cells.join('  |  '), margin, currentY);
+                  currentY += 12;
+                  break;
+                  
+                case 'paragraph':
+                  // Handle inline formatting (bold, italic)
+                  let text = element.text || '';
+                  
+                  // Remove markdown formatting for PDF (since jsPDF has limited formatting)
+                  text = text
+                    .replace(/\*\*([^*]+)\*\*/g, '$1') // Bold
+                    .replace(/\*([^*]+)\*/g, '$1')       // Italic
+                    .replace(/`([^`]+)`/g, '$1');          // Inline code
+                  
+                  addFormattedText(text);
+                  break;
+                  
+                case 'break':
+                  currentY += 8;
+                  break;
+              }
+            }
+            
+          } else if (part.type === 'code') {
+            if (currentY > pageHeight - 50) {
+              pdf.addPage();
+              currentY = margin;
+            }
+            
+            // Add code block with background
+            const codeHeight = part.content.split('\n').length * 5 + 20;
+            pdf.setFillColor(245, 245, 245);
+            pdf.rect(margin, currentY - 5, maxWidth, Math.min(codeHeight, pageHeight - currentY - 20), 'F');
+            
+            // Add code header
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(`Code (${part.language || 'text'}):`, margin + 5, currentY + 8);
+            currentY += 15;
+            
+            // Add code content
+            pdf.setFontSize(8);
+            pdf.setFont('courier', 'normal');
+            const codeLines = part.content.split('\n');
+            for (const line of codeLines) {
+              if (currentY > pageHeight - 20) {
+                pdf.addPage();
+                currentY = margin;
+              }
+              pdf.text(line, margin + 5, currentY);
+              currentY += 10;
+            }
+            currentY += 10;
+            
+          } else if (part.type === 'image') {
+            if (currentY > pageHeight - 100) {
+              pdf.addPage();
+              currentY = margin;
+            }
+            
+            // Try to embed actual image
+            try {
+              let imgData = part.content;
+              
+              // Extract base64 from markdown format if needed
+              const base64Match = part.content.match(/!\[.*?\]\(data:image\/[^;]+;base64,([^)]+)\)/);
+              if (base64Match) {
+                imgData = `data:image/png;base64,${base64Match[1]}`;
+              } else if (part.content.includes('data:image')) {
+                // Handle direct base64 format
+                const directMatch = part.content.match(/data:image\/[^;]+;base64,([^\s\)]+)/);
+                if (directMatch) {
+                  const fullMatch = part.content.match(/data:image\/[^;]+;base64,[^\s\)]+/);
+                  if (fullMatch) {
+                    imgData = fullMatch[0];
+                  }
+                }
+              }
+              
+              if (imgData.startsWith('data:image')) {
+                const imgWidth = Math.min(maxWidth, 160);
+                const imgHeight = imgWidth * 0.6; // Reasonable aspect ratio
+                
+                // Add image label
+                pdf.setFontSize(9);
+                pdf.setFont('helvetica', 'italic');
+                pdf.text('[Generated Visualization]', margin, currentY);
+                currentY += 12;
+                
+                // Add the image
+                pdf.addImage(imgData, 'PNG', margin, currentY, imgWidth, imgHeight);
+                currentY += imgHeight + 15;
+              } else {
+                // Fallback if image can't be processed
+                pdf.setFontSize(9);
+                pdf.setFont('helvetica', 'italic');
+                pdf.text('[Image: Generated visualization - could not embed]', margin, currentY);
+                currentY += 15;
+              }
+            } catch (imgError) {
+              console.warn('Failed to embed image in PDF:', imgError);
+              pdf.setFontSize(9);
+              pdf.setFont('helvetica', 'italic');
+              pdf.text('[Image: Generated visualization - embedding failed]', margin, currentY);
+              currentY += 15;
+            }
+          }
+        }
+        
+        // Add separator between messages
+        currentY += 8;
+        if (currentY < pageHeight - 25) {
+          pdf.setLineWidth(0.3);
+          pdf.setDrawColor(180, 180, 180);
+          pdf.line(margin, currentY, pageWidth - margin, currentY);
+          currentY += 15;
+        }
+      }
+
+      // Save the PDF
+      const fileName = `chat-conversation-${currentSession?.title?.replace(/[^a-zA-Z0-9]/g, '-') || 'untitled'}-${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+      
+    } catch (error) {
+      console.error('Failed to export PDF:', error);
+      alert('Failed to export PDF. Please try again.');
+    }
+  };
+
+  // PDF export using EXACT same parsing as frontend display (1:1 translation)
+  // Exports ENTIRE chat history from memory, not just current messages
+  const exportToPDF = async (filename?: string) => {
+    try {
+      // First, load the complete chat history from backend
+      console.log('Loading complete chat history for PDF export...');
+      
+      if (!currentSession?.id || !activeFile?.file_name) {
+        alert('Missing session or file information for export');
+        return;
+      }
+
+      const response = await fetch(apiEndpoints.chatHistory, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      let chatHistory: ChatHistoryItem[] = [];
+      
+      if (response.ok) {
+        chatHistory = await response.json();
+        console.log('📖 Loaded chat history for PDF:', chatHistory.length, 'items');
+      } else {
+        console.log('⚠️ Could not load chat history, using current messages only');
+      }
+
+      // If no chat history from backend, use current messages as fallback
+      if (chatHistory.length === 0 && messages.length === 0) {
+        alert('No conversation data to export');
+        return;
+      }
+
+      // Initialize PDF generation
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 20;
+      const maxWidth = pageWidth - 2 * margin;
+      let currentY = margin;
+
+      // Helper to check page breaks
+      const checkPageBreak = (height: number) => {
+        if (currentY + height > pageHeight - margin) {
+          pdf.addPage();
+          currentY = margin;
+        }
+      };
+
+      // Convert frontend renderMarkdownText elements to PDF
+      const renderMarkdownElementToPDF = (element: any) => {
+        if (!element) return;
+        
+        if (typeof element === 'string') {
+          // Plain text
+          const lines = pdf.splitTextToSize(element, maxWidth);
+          checkPageBreak(lines.length * 14 + 10);
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica', 'normal');
+          for (const line of lines) {
+            pdf.text(line, margin, currentY);
+            currentY += 14;
+          }
+          currentY += 8;
+          return;
+        }
+
+        if (!element.type) return;
+
+        switch (element.type) {
+          case 'h1':
+          case 'h2':
+          case 'h3':
+          case 'h4':
+          case 'h5':
+          case 'h6':
+            const headerLevel = parseInt(element.type[1]);
+            const fontSize = Math.max(18 - headerLevel, 12);
+            checkPageBreak(fontSize + 15);
+            pdf.setFontSize(fontSize);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(element.props?.children || '', margin, currentY);
+            currentY += fontSize + 15;
+            break;
+
+          case 'p':
+            const text = element.props?.children || '';
+            const lines = pdf.splitTextToSize(text, maxWidth);
+            checkPageBreak(lines.length * 14 + 12);
+            pdf.setFontSize(11);
+            pdf.setFont('helvetica', 'normal');
+            for (const line of lines) {
+              pdf.text(line, margin, currentY);
+              currentY += 14;
+            }
+            currentY += 12;
+            break;
+
+          case 'li':
+            checkPageBreak(18);
+            pdf.setFontSize(11);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('•', margin + 10, currentY);
+            const bulletText = element.props?.children || '';
+            const bulletLines = pdf.splitTextToSize(bulletText, maxWidth - 30);
+            for (const line of bulletLines) {
+              pdf.text(line, margin + 20, currentY);
+              currentY += 14;
+            }
+            currentY += 4;
+            break;
+
+          case 'pre':
+            const codeContent = element.props?.children?.props?.children || '';
+            const codeLines = codeContent.split('\n');
+            const codeHeight = codeLines.length * 12 + 20;
+            checkPageBreak(codeHeight);
+            
+            // Gray background
+            pdf.setFillColor(245, 245, 245);
+            pdf.rect(margin, currentY - 5, maxWidth, codeHeight - 10, 'F');
+            
+            pdf.setFontSize(9);
+            pdf.setFont('courier', 'normal');
+            for (const line of codeLines) {
+              pdf.text(line, margin + 5, currentY + 5);
+              currentY += 12;
+            }
+            currentY += 15;
+            break;
+
+          default:
+            // Handle nested children
+            if (element.props?.children) {
+              if (Array.isArray(element.props.children)) {
+                element.props.children.forEach((child: any) => renderMarkdownElementToPDF(child));
+              } else {
+                renderMarkdownElementToPDF(element.props.children);
+              }
+            }
+            break;
+        }
+      };
+
+      // Process each message using SAME logic as frontend
+      const processMessages = async () => {
+        // Add title
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(`Chat Conversation - ${currentSession?.title || 'Untitled'}`, margin, currentY);
+        currentY += 25;
+
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`Exported: ${new Date().toLocaleString()}`, margin, currentY);
+        currentY += 25;
+
+        // Process data from chat history (preferred) or current messages (fallback)
+        if (chatHistory.length > 0) {
+          console.log('📄 Processing complete chat history for PDF...');
+          
+          // Process chat history format: {question: string, answer: string | string[]}
+          for (const historyItem of chatHistory) {
+            // USER QUESTION
+            checkPageBreak(20);
+            pdf.setFontSize(12);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('👤 User', margin, currentY);
+            currentY += 20;
+            
+            // Parse user question using same logic as frontend
+            const questionParts = parseMessageContent(historyItem.question);
+            await processMessageParts(questionParts);
+            
+            // ASSISTANT ANSWER  
+            checkPageBreak(20);
+            pdf.setFontSize(12);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('🤖 Assistant', margin, currentY);
+            currentY += 20;
+            
+            // Handle answer (string or array format from memory)
+            const cleanAnswer = parseAnswerContent(historyItem.answer);
+            const answerParts = parseMessageContent(cleanAnswer);
+            await processMessageParts(answerParts);
+            
+            // Separator
+            currentY += 10;
+            if (currentY < pageHeight - 30) {
+              pdf.setLineWidth(0.3);
+              pdf.setDrawColor(200, 200, 200);
+              pdf.line(margin, currentY, pageWidth - margin, currentY);
+              currentY += 15;
+            }
+          }
+        } else {
+          console.log('📄 Processing current messages for PDF...');
+          
+          // Fallback: process current messages
+          for (const message of messages) {
+            // Role header
+            checkPageBreak(20);
+            pdf.setFontSize(12);
+            pdf.setFont('helvetica', 'bold');
+            const roleText = message.role === 'user' ? '👤 User' : '🤖 Assistant';
+            pdf.text(roleText, margin, currentY);
+            currentY += 20;
+
+            // Use EXACT same parsing as frontend
+            const parts = parseMessageContent(message.content);
+            await processMessageParts(parts);
+            
+            // Message separator
+            currentY += 10;
+            if (currentY < pageHeight - 30) {
+              pdf.setLineWidth(0.3);
+              pdf.setDrawColor(200, 200, 200);
+              pdf.line(margin, currentY, pageWidth - margin, currentY);
+              currentY += 15;
+            }
+          }
+        }
+
+        // Helper function to process message parts (shared between both paths)
+        async function processMessageParts(parts: any[]) {
+          
+          for (const part of parts) {
+            if (part.type === 'text') {
+              // Clean and parse the text content for human readability
+              let cleanText = part.content;
+              
+              // Remove any streaming format artifacts
+              cleanText = parseHistoricalMessage(cleanText);
+              
+              // Use SAME renderMarkdownText logic as frontend
+              const elements = renderMarkdownText(cleanText);
+              
+              // Process the parsed markdown elements
+              if (elements && elements.props && elements.props.children) {
+                await processReactElements(elements.props.children);
+              } else {
+                // Fallback: process as plain text with basic formatting
+                await processPlainText(cleanText);
+              }
+
+            } else if (part.type === 'code') {
+              // Code blocks - same as frontend
+              const codeLines = part.content.split('\n');
+              const codeHeight = codeLines.length * 12 + 25;
+              checkPageBreak(codeHeight);
+
+              pdf.setFillColor(245, 245, 245);
+              pdf.rect(margin, currentY - 5, maxWidth, codeHeight - 10, 'F');
+              
+              pdf.setFontSize(9);
+              pdf.setFont('helvetica', 'bold');
+              pdf.text(`Code (${part.language || 'text'}):`, margin + 5, currentY + 8);
+              currentY += 15;
+
+              pdf.setFontSize(8);
+              pdf.setFont('courier', 'normal');
+              for (const line of codeLines) {
+                pdf.text(line, margin + 5, currentY);
+                currentY += 12;
+              }
+              currentY += 15;
+
+            } else if (part.type === 'image') {
+              // Images - same extraction as frontend
+              await new Promise<void>((resolve) => {
+                try {
+                  let imgData = part.content;
+                  
+                  // Use SAME image extraction logic
+                  const base64Match = part.content.match(/!\[.*?\]\(data:image\/[^;]+;base64,([^)]+)\)/);
+                  if (base64Match) {
+                    imgData = `data:image/png;base64,${base64Match[1]}`;
+                  } else if (part.content.includes('data:image')) {
+                    const directMatch = part.content.match(/data:image\/[^;]+;base64,([^\s\)]+)/);
+                    if (directMatch) {
+                      const fullMatch = part.content.match(/data:image\/[^;]+;base64,[^\s\)]+/);
+                      if (fullMatch) {
+                        imgData = fullMatch[0];
+                      }
+                    }
+                  }
+                  
+                  if (imgData.startsWith('data:image')) {
+                    const imgWidth = Math.min(maxWidth * 0.8, 400);
+                    const imgHeight = imgWidth * 0.6;
+                    
+                    checkPageBreak(imgHeight + 25);
+                    
+                    const xPosition = margin + (maxWidth - imgWidth) / 2;
+                    pdf.addImage(imgData, 'PNG', xPosition, currentY, imgWidth, imgHeight);
+                    currentY += imgHeight + 20;
+                  } else {
+                    currentY += 15;
+                  }
+                } catch (error) {
+                  console.error('Image error:', error);
+                  currentY += 15;
+                }
+                resolve();
+              });
+            }
+          }
+        }
+
+        // Helper function to process React elements into human-readable PDF content
+        async function processReactElements(children: any) {
+          const childArray = Array.isArray(children) ? children : [children];
+          
+          for (const child of childArray) {
+            if (typeof child === 'string') {
+              // Plain text - clean and format
+              if (child.trim()) {
+                await processPlainText(child);
+              }
+            } else if (child && child.type) {
+              // React elements - convert to appropriate PDF formatting
+              switch (child.type) {
+                case 'h1':
+                case 'h2':
+                case 'h3':
+                case 'h4':
+                case 'h5':
+                case 'h6':
+                  const level = parseInt(child.type[1]);
+                  const headerSize = Math.max(16 - level * 2, 12);
+                  checkPageBreak(headerSize + 10);
+                  pdf.setFontSize(headerSize);
+                  pdf.setFont('helvetica', 'bold');
+                  const headerText = extractTextContent(child.props?.children);
+                  pdf.text(headerText, margin, currentY);
+                  currentY += headerSize + 8;
+                  break;
+
+                case 'p':
+                  const paraText = extractTextContent(child.props?.children);
+                  if (paraText.trim()) {
+                    await processPlainText(paraText);
+                    currentY += 6; // Extra paragraph spacing
+                  }
+                  break;
+
+                case 'div':
+                  // Check for special div classes (like bullet points)
+                  const className = child.props?.className || '';
+                  if (className.includes('flex items-start')) {
+                    // Bullet point
+                    const bulletText = extractTextContent(child.props?.children);
+                    if (bulletText.trim()) {
+                      checkPageBreak(16);
+                      pdf.setFontSize(11);
+                      pdf.setFont('helvetica', 'normal');
+                      pdf.text('•', margin + 10, currentY);
+                      const lines = pdf.splitTextToSize(bulletText, maxWidth - 30);
+                      for (const line of lines) {
+                        pdf.text(line, margin + 20, currentY);
+                        currentY += 14;
+                      }
+                      currentY += 4;
+                    }
+                  } else {
+                    // Regular div - process children
+                    if (child.props?.children) {
+                      await processReactElements(child.props.children);
+                    }
+                  }
+                  break;
+
+                case 'table':
+                  await processTable(child);
+                  break;
+
+                case 'pre':
+                  await processCodeBlock(child);
+                  break;
+
+                default:
+                  // Process children for unknown elements
+                  if (child.props?.children) {
+                    await processReactElements(child.props.children);
+                  }
+                  break;
+              }
+            }
+          }
+        }
+
+        // Helper function to process plain text with proper formatting
+        async function processPlainText(text: string) {
+          if (!text || !text.trim()) return;
+          
+          // Clean the text
+          const cleanedText = text
+            .replace(/\s+/g, ' ')  // Normalize whitespace
+            .trim();
+          
+          const lines = pdf.splitTextToSize(cleanedText, maxWidth);
+          checkPageBreak(lines.length * 14 + 6);
+          
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica', 'normal');
+          
+          for (const line of lines) {
+            pdf.text(line, margin, currentY);
+            currentY += 14;
+          }
+          currentY += 8;
+        }
+
+        // Helper function to extract text content from React elements
+        function extractTextContent(element: any): string {
+          if (typeof element === 'string') {
+            return element;
+          }
+          
+          if (Array.isArray(element)) {
+            return element.map(extractTextContent).join('');
+          }
+          
+          if (element && element.props && element.props.children) {
+            return extractTextContent(element.props.children);
+          }
+          
+          return '';
+        }
+
+        // Helper function to process tables
+        async function processTable(tableElement: any) {
+          // Simple table processing - extract rows and cells
+          const tableText = extractTextContent(tableElement);
+          if (tableText.trim()) {
+            checkPageBreak(50);
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'normal');
+            
+            // Process as simple text for now (could be enhanced for proper table layout)
+            const lines = pdf.splitTextToSize(tableText, maxWidth);
+            for (const line of lines) {
+              pdf.text(line, margin, currentY);
+              currentY += 12;
+            }
+            currentY += 8;
+          }
+        }
+
+        // Helper function to process code blocks
+        async function processCodeBlock(preElement: any) {
+          const codeText = extractTextContent(preElement);
+          if (codeText.trim()) {
+            const codeLines = codeText.split('\n');
+            const codeHeight = codeLines.length * 12 + 20;
+            checkPageBreak(codeHeight);
+            
+            // Gray background
+            pdf.setFillColor(245, 245, 245);
+            pdf.rect(margin, currentY - 5, maxWidth, codeHeight - 10, 'F');
+            
+            pdf.setFontSize(9);
+            pdf.setFont('courier', 'normal');
+            
+            for (const line of codeLines) {
+              pdf.text(line, margin + 5, currentY + 5);
+              currentY += 12;
+            }
+            currentY += 15;
+          }
+        }
+
+        // Save PDF
+        const pdfFilename = filename || `chat-${currentSession?.title?.replace(/[^a-zA-Z0-9]/g, '-') || 'conversation'}-${new Date().toISOString().split('T')[0]}.pdf`;
+        pdf.save(pdfFilename);
+      };
+
+      processMessages();
+
+    } catch (error) {
+      console.error('PDF export failed:', error);
+      alert('PDF export failed. Please try again.');
+    }
+  };
+
 
   // Resend the last user question
   const resendLastQuestion = async () => {
@@ -954,6 +1732,51 @@ const ChatPage: React.FC = () => {
     return cleanedContent.replace(/\n$/, ''); // Remove trailing newline
   };
 
+  // Parse answer content that can be either string or list format
+  const parseAnswerContent = (answer: string | string[]): string => {
+    // Handle string format (legacy)
+    if (typeof answer === 'string') {
+      return parseHistoricalMessage(answer);
+    }
+    
+    // Handle list format (new format from memory)
+    if (Array.isArray(answer)) {
+      let cleanedContent = '';
+      
+      for (const item of answer) {
+        if (typeof item === 'string') {
+          // Each item should be in 'data: {json}' format
+          const trimmedItem = item.trim();
+          
+          if (trimmedItem.startsWith('data: ')) {
+            try {
+              const jsonString = trimmedItem.substring(6).trim();
+              const jsonData = JSON.parse(jsonString);
+              
+              if (jsonData.type === 'text') {
+                cleanedContent += jsonData.data;
+              } else if (jsonData.type === 'image') {
+                // Convert image data back to markdown format
+                cleanedContent += `\n![Generated Image](data:image/png;base64,${jsonData.data})\n`;
+              }
+            } catch (error) {
+              // If JSON parsing fails, treat as plain text
+              cleanedContent += item;
+            }
+          } else {
+            // Regular text item
+            cleanedContent += item;
+          }
+        }
+      }
+      
+      return cleanedContent;
+    }
+    
+    // Fallback for unexpected format
+    return String(answer || '');
+  };
+
   // Load messages for a session
   const loadMessages = useCallback(async (sessionId: string) => {
     try {
@@ -1063,24 +1886,25 @@ const ChatPage: React.FC = () => {
         
         // Validate that the response is an array of objects with question/answer format
         if (chatHistory && Array.isArray(chatHistory) && chatHistory.length > 0) {
-          // Validate each item has the expected format
+          // Validate each item has the expected format (answer can be string or array)
           const isValidFormat = chatHistory.every(item => 
             item && 
             typeof item === 'object' && 
             typeof item.question === 'string' && 
-            typeof item.answer === 'string'
+            (typeof item.answer === 'string' || Array.isArray(item.answer))
           );
           
           if (!isValidFormat) {
             console.warn('⚠️ Backend response format validation failed - some items missing question/answer fields');
-            console.log('📋 Expected: [{"question": "...", "answer": "..."}]');
+            console.log('📋 Expected: [{"question": "...", "answer": "..." | ["..."]}]');
             console.log('📋 Received:', chatHistory);
           }
           // Convert chat history to dialog format: questions on RIGHT (user), answers on LEFT (assistant)
           const messages: Message[] = [];
           chatHistory.forEach((item, index) => {
-            // Skip invalid items but continue processing
-            if (!item || typeof item.question !== 'string' || typeof item.answer !== 'string') {
+            // Skip invalid items but continue processing (answer can be string or array)
+            if (!item || typeof item.question !== 'string' || 
+                (typeof item.answer !== 'string' && !Array.isArray(item.answer))) {
               console.warn(`⚠️ Skipping invalid chat history item at index ${index}:`, item);
               return;
             }
@@ -1090,7 +1914,7 @@ const ChatPage: React.FC = () => {
             
             // Clean up escaped quotes and normalize content
             const cleanQuestion = item.question.replace(/\\'/g, "'").replace(/\\"/g, '"');
-            const cleanAnswer = item.answer.replace(/\\'/g, "'").replace(/\\"/g, '"');
+            const cleanAnswer = parseAnswerContent(item.answer);
             
             // Add user question (will appear on RIGHT side)
             messages.push({
@@ -1112,7 +1936,7 @@ const ChatPage: React.FC = () => {
           setMessages(messages);
           console.log(`✅ Successfully converted ${chatHistory.length} chat history items to ${messages.length} dialog messages`);
           console.log('💬 Chat history recreated: Questions on RIGHT (user), Answers on LEFT (assistant)');
-          console.log(`📋 Sample format - Question: "${chatHistory[0].question.substring(0, 30)}..." Answer: "${chatHistory[0].answer.substring(0, 30)}..."`);
+          console.log(`📋 Sample format - Question: "${chatHistory[0].question.substring(0, 30)}..." Answer: "${String(chatHistory[0].answer).substring(0, 30)}..."`);
           console.log(`📁 Chat history loaded for file: ${activeFileName}`);
         } else {
           console.log('📝 No previous conversation history found - showing empty chat (like new session)');
@@ -2185,6 +3009,24 @@ const ChatPage: React.FC = () => {
                 )}
               </div>
             )}
+            
+            {/* PDF Export Button */}
+            {(messages.length > 0 || currentSession?.id) && (
+              <button
+                onClick={async () => await exportToPDF()}
+                disabled={isLoading}
+                className={`flex items-center space-x-2 px-4 py-3 rounded-2xl transition-all duration-200 group shadow-sm hover:shadow-md hover:scale-105 font-semibold ${
+                  isLoading
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-medium hover:shadow-strong'
+                }`}
+                title={isLoading ? "Please wait for the response to complete" : "Export conversation to PDF"}
+              >
+                <Download className="w-5 h-5" />
+                <span>PDF</span>
+              </button>
+            )}
+            
             <button
               onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
               className={`p-2.5 rounded-2xl transition-all duration-200 group shadow-soft hover:shadow-medium hover:scale-105 ${

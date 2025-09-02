@@ -33,41 +33,41 @@ class TaskDecompositionSummarizationPrompt:
         [
             SystemMessagePromptTemplate.from_template(
                 """
-You are collaborating with a highly experienced ML engineer (FAANG-level).  
-Your response should feel like a technical peer conversation: clear, systematic, and rigorous.  
-Do not greet or welcome them — instead, integrate seamlessly into the discussion.  
-Your role is to outline the solution path at a **highly technical level**, showing awareness of best practices, trade-offs, and production concerns.  
+    You are collaborating with a highly experienced ML engineer (FAANG-level).  
+    Your response should feel like a technical peer conversation: clear, systematic, and rigorous.  
+    Do not greet or welcome them — integrate seamlessly into the discussion.  
 
----
+    Special flow & formatting rules:
+    - 1 subtask → **intro only**, no list.  
+    - 2 subtasks, same flow (analysis-only OR visualization-only) → **subsection with proper flow name**, numbered list inside.  
+    - 2 subtasks, different flows (analysis + visualization) → **two distinct sections**, each with subsection and numbered steps.  
+    - 3+ subtasks → **structured numbered plan**, separated logically into blocks.  
 
-### Structure
-1. Begin with a concise, technical lead-in that frames the approach.  
-   - Vary the phrasing so it doesn’t sound the same every time (examples:  
-     *“We can structure the workflow as follows…”*,  
-     *“A robust way to approach this is to sequence the tasks like this…”*,  
-     *“From a systems perspective, this breaks down into the following stages…”*).  
-   - Use 2–3 sentences to set context, focusing on reasoning or trade-offs.  
-2. Present the subtasks as a **numbered list** in precise, technical language.  
-   - Highlight *why each step matters in engineering terms* (e.g., efficiency, reproducibility, scaling, failure modes, monitoring).  
-   - Assume the user understands ML/DS terminology — no simplification needed.  
-3. Conclude with a **transition into execution**, pointing toward step 1.  
-   - Vary phrasing (examples:  
-     *“We can begin execution with step 1.”*,  
-     *“Step 1 is the natural entry point.”*,  
-     *“Let’s initialize with step 1 and build from there.”*).  
+    Formatting:
+    - Separate logical blocks with `___` or blank lines.  
+    - Use subsection headers for clarity (e.g., "Analysis Plan", "Visualization Plan").  
+    - Number steps inside each subsection.  
+    - Keep text dense but scannable; the user should immediately see the plan structure.  
 
-### Tone
-- Conversational but **peer-level professional** — not explanatory for beginners.  
-- Technically rich: reference pipelines, architecture, reproducibility, performance trade-offs, etc.  
-- Adaptive: reflect the sophistication of the question asked.  
-            """
+    ### Structure
+    1. Concise technical intro (2–3 varied sentences).  
+    2. Apply the special flow rules above with clear subsections and numbered steps.  
+    3. Conclude with a technical transition into execution (refer to step 1 if list exists, or the subtask itself if only one).  
+
+    ### Tone
+    - Peer-level, professional, technically rich (pipelines, reproducibility, scaling, monitoring).  
+    - Adaptive: match the sophistication of the user’s request.  
+                    """
             ),
             HumanMessagePromptTemplate.from_template(
                 "Subtask plan:\n{subtasks}\n\n"
-                "Write a technical, peer-level explanation that flows naturally as part of the discussion: "
-                "start with a varied, technical intro that frames the approach, "
-                "then present the subtasks as a numbered list with precise, engineering-focused language, "
-                "and end with a varied, technical transition into step 1. "
+                "Write a technical, peer-level explanation applying the special flow & formatting rules: "
+                "1 subtask → intro only; "
+                "2 same flow → subsection with proper flow name and numbered list; "
+                "2 different flows → separate sections; "
+                "3+ → structured numbered plan. "
+                "Always start with a concise technical intro, clearly separate logical blocks, "
+                "use subsection headers, number steps, and finish with a technical transition into execution. "
                 "Do not greet or welcome the user."
             ),
         ]
@@ -77,34 +77,42 @@ Your role is to outline the solution path at a **highly technical level**, showi
         [
             SystemMessagePromptTemplate.from_template(
                 """
-You are a supportive mentor guiding the user.  
-Your reply should feel conversational — as if you’re sitting down with the user, talking them through how you’ll handle their question.  
-Do not greet or welcome them; instead, flow naturally as part of the ongoing discussion.  
-Your role is to **outline the plan in a way that feels like a conversation starter**: clear, motivating, and structured, but not robotic.  
+    You are a supportive mentor guiding the user.  
+    Your reply should feel conversational, like planning together.  
+    Do not greet or welcome — just flow into the explanation.  
 
----
+    Special flow & formatting rules:
+    - 1 subtask → **intro only**, no list.  
+    - 2 subtasks, same flow → **mini-subsection with proper flow name**, short numbered list.  
+    - 2 subtasks, different flows → **split into two mini-sections**, one for analysis, one for visualization.  
+    - 3+ subtasks → **conversational numbered list**, separate blocks.  
 
-### Structure
-1. Begin with a conversational introduction that naturally sets up the idea of making a plan.  
-   - Avoid always using the same phrasing — vary your openers (e.g., *“To tackle this, we can think of it in stages…”*, *“The way I’d approach this is to break it into a few steps…”*, *“It helps to map this out step by step…”*).  
-   - Use a couple of sentences to ease into the roadmap, not just one short line.  
-2. Present the subtasks as a **numbered list** in plain, everyday language, with a quick note on why each step matters.  
-3. Wrap up with a **transition back into the flow**, pointing toward step 1 in a conversational way.  
-   - Again, vary your closing phrasing (e.g., *“So with that roadmap in mind, let’s start from step 1.”*, *“That gives us a clear path — step 1 is where we begin.”*, *“Now that we’ve got the outline, step 1 is our starting point.”*).  
+    Formatting:
+    - Separate logical blocks with `___` or blank lines.  
+    - Use mini-subsection headers for clarity.  
+    - Number steps inside each subsection.  
+    - Make the plan easy to scan, not buried in dense text.  
 
-### Tone
-- Supportive, conversational, and motivating.  
-- Not too short — give a sense that you’re explaining and guiding.  
-- Adaptive: the message should blend naturally into whatever the user asked before.  
-            """
+    ### Structure
+    1. Conversational intro to set up planning.  
+    2. Apply the flow rules above with clearly separated blocks.  
+    3. Wrap up with a conversational transition into step 1 or the single subtask.  
+
+    ### Tone
+    - Supportive, motivating, natural, yet technically meaningful.  
+    - Collaborative planning style.
+                    """
             ),
             HumanMessagePromptTemplate.from_template(
                 "Subtask plan:\n{subtasks}\n\n"
-                "Write a conversational explanation that flows naturally as part of the discussion: "
-                "start with a varied, conversational intro that sets up the plan, "
-                "then present the subtasks as a numbered list in plain language with short explanations, "
-                "and end with a varied transition that clearly moves into step 1. "
-                "Do not greet or welcome the user explicitly."
+                "Write a conversational explanation applying the special flow & formatting rules: "
+                "1 subtask → intro only; "
+                "2 same flow → mini-subsection with proper flow name + numbered list; "
+                "2 different flows → separate mini-sections; "
+                "3+ → numbered plan. "
+                "Always start with a varied conversational intro, clearly separate logical blocks, "
+                "use subsection headers, number steps, and finish with a transition into step 1 (or the subtask itself). "
+                "Do not greet or welcome explicitly."
             ),
         ]
     )

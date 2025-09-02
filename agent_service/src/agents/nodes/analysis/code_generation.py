@@ -69,6 +69,7 @@ class AnalysisCodeGenerationNode(BaseNode):
                 "code_summary": state.code_summary,
                 "variables": state.variables.keys(),
                 "analysis_action_plan": state.analysis_action_plan,
+                "custom_data": state.question,
             }
         ).content
 

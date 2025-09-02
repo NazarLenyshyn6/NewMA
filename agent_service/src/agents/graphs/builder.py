@@ -58,6 +58,10 @@ from agents.nodes.task.decomposition_summarization import (
     TaskDecompositionSummarizationNode,
     TaskDecompositionSummarizationNodeRegistry,
 )
+from agents.nodes.fallback_handling import (
+    FallbackHandlingNode,
+    FallbackHandlingNodeRegistry,
+)
 from agents.nodes.visualization.display import VisualizationDisplayNode
 from agents.nodes.code.execution import CodeExecutionNode
 from agents.nodes.code.debagging import CodeDebuggingNode, CodeDebaggingNodeRegistry
@@ -100,6 +104,7 @@ class AgentGraphBuilder(BaseModel):
     visualization_action_planing_node: VisualizationActionPlaningNode
     visualization_code_generation_node: VisualizationCodeGenerationNode
     code_debagging_node: CodeDebuggingNode
+    fallback_handling_node: FallbackHandlingNode
 
     _graph: StateGraph = PrivateAttr()
 
@@ -152,7 +157,7 @@ class AgentGraphBuilder(BaseModel):
         )
         self._graph.add_node("visualization_display", VisualizationDisplayNode.invoke)
         self._graph.add_node("direct_responder", self.direct_responding_node.invoke)
-        self._graph.add_node("fallback_handler", lambda state: state)
+        self._graph.add_node("fallback_handler", self.fallback_handling_node.invoke)
         self._graph.add_node("memory_saver", MemorySaveNode.invoke)
 
     def _add_edges(self):
@@ -172,7 +177,7 @@ class AgentGraphBuilder(BaseModel):
         self._graph.add_edge("analysis_code_generator", "code_executor")
         self._graph.add_edge("visualization_code_generator", "code_executor")
         self._graph.add_edge("code_debugger", "code_executor")
-        self._graph.add_edge("fallback_handler", END)
+        self._graph.add_edge("fallback_handler", "memory_saver")
         self._graph.add_edge("memory_saver", END)
 
     def _add_conditional_edges(self):
@@ -275,6 +280,7 @@ class AgentGraphRegistry:
         visualization_action_planing_node=VisualizationActionPlaningNodeRegistry.TECHNICAL_MODE,
         visualization_code_generation_node=VisualizationCodeGenerationNodeRegistry.TECHNICAL_MODE,
         code_debagging_node=CodeDebaggingNodeRegistry.UNIFIED,
+        fallback_handling_node=FallbackHandlingNodeRegistry.UNIFIED,
     ).build()
 
     # QUICK_ANALYSIS_MODE configuration:
@@ -295,4 +301,5 @@ class AgentGraphRegistry:
         visualization_action_planing_node=VisualizationActionPlaningNodeRegistry.QUICK_VISUALIZATION_MODE,
         visualization_code_generation_node=VisualizationCodeGenerationNodeRegistry.QUICK_VISUALIZATION_MODE,
         code_debagging_node=CodeDebaggingNodeRegistry.UNIFIED,
+        fallback_handling_node=FallbackHandlingNodeRegistry.UNIFIED,
     ).build()

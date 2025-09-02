@@ -59,6 +59,9 @@ class TaskRoutingNode(BaseNode):
         MemoryRetrievalNode.get_analysis_summary(state)
         MemoryRetrievalNode.get_visualization_summary(state)
         MemoryRetrievalNode.get_user_preferences_summary(state)
+        MemoryRetrievalNode.get_pending_context(state)
+
+        print("PENDING CONTEXT:", state.pending_context)
 
         # Invoke the task routing chain to determine the appropriate task flow
         state.task_flow = self._chain.invoke(
@@ -67,6 +70,7 @@ class TaskRoutingNode(BaseNode):
                 "analysis_summary": state.analysis_summary,
                 "visualization_summary": state.visualization_summary,
                 "user_preferences_summary": state.user_preferences_summary,
+                "pending_context": state.pending_context,
             },
             config={"metadata": {"stream": False}},
         ).content

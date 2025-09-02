@@ -18,6 +18,7 @@ ensuring clean separation between memory access and other node logic.
 """
 
 import pickle
+import json
 
 from agents.state import AgentState
 from services.memory import memory_service
@@ -132,6 +133,25 @@ class MemoryRetrievalNode:
             )
 
     @staticmethod
+    def get_pending_context(state: AgentState):
+        """
+        Load and attach stored pending context to the agent state.
+
+        Args:
+            state (AgentState): The current agent execution state.
+        """
+        if state.pending_context is None:
+            state.pending_context = pickle.loads(
+                memory_service.get_memory(
+                    db=state.db,
+                    user_id=state.user_id,
+                    session_id=state.session_id,
+                    file_name=state.file_name,
+                    storage_uri=state.storage_uri,
+                ).pending_context
+            )
+
+    @staticmethod
     def add_question(state: AgentState, question: str):
         """
         Add a question to the current new conversation in the agent state.
@@ -151,6 +171,19 @@ class MemoryRetrievalNode:
             state (AgentState): The current agent execution state.
             answer (str): The answer text to append.
         """
-        state.new_conversation[0]["answer"] = (
-            state.new_conversation[0]["answer"] + answer
+        state.new_conversation[0]["answer"].append(
+            f"data: {json.dumps({'type': 'text', 'data': answer})}\n\n"
+        )
+
+    @staticmethod
+    def add_visualization(state: AgentState, visualization: str):
+        """
+        Append visualization to the current new conversation in the agent state.
+
+        Args:
+            state (AgentState): The current agent execution state.
+            visualization (str): The image to append.
+        """
+        state.new_conversation[0]["answer"].append(
+            f"data: {json.dumps({'type': 'image', 'data': visualization})}\n\n"
         )

@@ -1,10 +1,31 @@
+"""
+
+This module defines the `TaskDecompositionOutput` model, which represents the
+structured output of an agent's task decomposition process. The model ensures
+that generated subtasks are explicitly ordered, logically connected, and
+designed to progressively deepen problem understanding.
+
+The design enforces strict rules:
+- Each subtask must build upon the previous one.
+- Subtasks must be expert-level, precise, and concise.
+- Redundant replanning or redoing already completed work is prohibited.
+- Subtasks are textual action instructions only (no code, no data ingestion).
+"""
+
 from collections import deque
 from typing import Deque
 from pydantic import BaseModel, Field
 
 
 class TaskDecompositionOutput(BaseModel):
-    """..."""
+    """
+    Structured container for agent-generated subtasks.
+
+    This model encapsulates the decomposition of a complex task into a sequence
+    of smaller, logically dependent subtasks. Each subtask is represented as a
+    string instruction, with strict guarantees on ordering and progression.
+
+    """
 
     subtasks: Deque[str] = Field(
         default_factory=deque,

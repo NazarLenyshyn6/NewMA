@@ -109,6 +109,7 @@ class AgentState(BaseModel):
     visualization_summary: Optional[str] = Field(default=None)
     code_summary: Optional[str] = Field(default=None)
     user_preferences_summary: Optional[str] = Field(default=None)
+    pending_context: Optional[str] = Field(default=None)
     variables: Optional[Dict] = Field(default=None)
 
     # --------------------
@@ -116,7 +117,7 @@ class AgentState(BaseModel):
         default=[
             {
                 "question": "",
-                "answer": "",
+                "answer": [],
             }
         ]
     )
@@ -139,7 +140,7 @@ class AgentState(BaseModel):
 
     # --------------------
     max_debugging_attempts: int = Field(default=5)
-    current_debugging_attempt: int = Field(default=0)
+    current_debugging_attempt: int = Field(default=1)
 
     # --------------------
     analysis_report: Optional[List] = Field(default=None)
